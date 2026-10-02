@@ -10,6 +10,8 @@ import * as ServerSettings from "../serverSettings.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as VcsDriverRegistry from "../vcs/VcsDriverRegistry.ts";
 import * as ReviewService from "./ReviewService.ts";
+import * as RepositoryDiscovery from "../workspace/RepositoryDiscovery.ts";
+import * as ReviewWorkspaceRoots from "./ReviewWorkspaceRoots.ts";
 
 function layer(input: {
   readonly workspaceRoot: string;
@@ -19,6 +21,14 @@ function layer(input: {
   readonly previousWorktreesDirectories?: ReadonlyArray<string>;
 }) {
   return ReviewService.layer.pipe(
+    Layer.provide(
+      Layer.mock(RepositoryDiscovery.RepositoryDiscovery)({
+        discover: () => Effect.succeed(null),
+      }),
+    ),
+    Layer.provide(
+      Layer.succeed(ReviewWorkspaceRoots.ReviewWorkspaceRoots, { list: () => Effect.succeed([]) }),
+    ),
     Layer.provide(
       Layer.mock(VcsDriverRegistry.VcsDriverRegistry)({
         get: () => Effect.die("unexpected VCS registry get"),
@@ -57,6 +67,7 @@ describe("ReviewService", () => {
       }).pipe(Effect.provide(layer({ workspaceRoot, baseDir, detectCalls })));
 
       assert.strictEqual(error._tag, "VcsRepositoryDetectionError");
+      if (error._tag !== "VcsRepositoryDetectionError") return;
       assert.strictEqual(error.operation, "ReviewService.getDiffPreview");
       assert.match(
         "detail" in error ? error.detail : "",
@@ -90,6 +101,7 @@ describe("ReviewService", () => {
       }).pipe(Effect.provide(layer({ workspaceRoot, baseDir, detectCalls })));
 
       assert.strictEqual(error._tag, "VcsRepositoryDetectionError");
+      if (error._tag !== "VcsRepositoryDetectionError") return;
       assert.strictEqual(error.operation, "ReviewService.getDiffFileContents");
       assert.match(
         "detail" in error ? error.detail : "",

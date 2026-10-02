@@ -433,7 +433,7 @@ export function buildReviewSectionItems(input: {
   );
 
   const gitItems = input.gitSections.map<ReviewSectionItem>((section) => ({
-    id: `git:${section.kind}`,
+    id: `git:${section.repository ? section.id : section.kind}`,
     kind: section.kind,
     title: section.title,
     subtitle: gitSubtitle(section),

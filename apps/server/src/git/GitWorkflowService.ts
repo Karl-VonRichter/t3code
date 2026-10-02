@@ -30,6 +30,7 @@ import {
 
 import * as GitManager from "./GitManager.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
+import * as RepositoryDiscovery from "../workspace/RepositoryDiscovery.ts";
 import * as VcsDriverRegistry from "../vcs/VcsDriverRegistry.ts";
 
 export class GitWorkflowService extends Context.Service<
@@ -118,9 +119,10 @@ export class GitWorkflowService extends Context.Service<
   }
 >()("t3/git/GitWorkflowService") {}
 
-function nonRepositoryLocalStatus(): VcsStatusLocalResult {
+function nonRepositoryLocalStatus(workspaceKind?: "directory"): VcsStatusLocalResult {
   return {
     isRepo: false,
+    ...(workspaceKind ? { workspaceKind } : {}),
     hasPrimaryRemote: false,
     isDefaultRef: false,
     refName: null,
@@ -133,9 +135,9 @@ function nonRepositoryLocalStatus(): VcsStatusLocalResult {
   };
 }
 
-function nonRepositoryStatus(): VcsStatusResult {
+function nonRepositoryStatus(workspaceKind?: "directory"): VcsStatusResult {
   return {
-    ...nonRepositoryLocalStatus(),
+    ...nonRepositoryLocalStatus(workspaceKind),
     hasUpstream: false,
     aheadCount: 0,
     behindCount: 0,
@@ -159,6 +161,19 @@ export const make = Effect.gen(function* () {
   const registry = yield* VcsDriverRegistry.VcsDriverRegistry;
   const git = yield* GitVcsDriver.GitVcsDriver;
   const gitManager = yield* GitManager.GitManager;
+  const discovery = yield* RepositoryDiscovery.RepositoryDiscovery;
+  const isWorkspaceRoot = (cwd: string) =>
+    discovery.isContainer(cwd).pipe(
+      Effect.mapError(
+        (cause) =>
+          new GitManagerError({
+            operation: "GitWorkflowService.isWorkspaceRoot",
+            cwd,
+            detail: "Cannot inspect the project folder.",
+            cause,
+          }),
+      ),
+    );
 
   const ensureGit = Effect.fn("GitWorkflowService.ensureGit")(function* (
     operation: string,
@@ -212,6 +227,7 @@ export const make = Effect.gen(function* () {
 
   const detectGitRepositoryForStatus = Effect.fn("GitWorkflowService.detectGitRepositoryForStatus")(
     function* (operation: string, cwd: string) {
+      if (yield* isWorkspaceRoot(cwd)) return "directory" as const;
       const handle = yield* registry.detect({ cwd }).pipe(
         Effect.mapError(
           (cause) =>
@@ -276,7 +292,10 @@ export const make = Effect.gen(function* () {
 
   return GitWorkflowService.of({
     isRepository: (cwd) =>
-      registry.detect({ cwd }).pipe(
+      isWorkspaceRoot(cwd).pipe(
+        Effect.flatMap((container) =>
+          container ? Effect.succeed(null) : registry.detect({ cwd }),
+        ),
         Effect.map((handle) => handle?.kind === "git"),
         Effect.mapError(
           (cause) =>
@@ -303,21 +322,27 @@ export const make = Effect.gen(function* () {
     status: (input) =>
       detectGitRepositoryForStatus("GitWorkflowService.status", input.cwd).pipe(
         Effect.flatMap((isGitRepository) =>
-          isGitRepository ? gitManager.status(input) : Effect.succeed(nonRepositoryStatus()),
+          isGitRepository === true
+            ? gitManager.status(input)
+            : Effect.succeed(
+                nonRepositoryStatus(isGitRepository === "directory" ? "directory" : undefined),
+              ),
         ),
       ),
     localStatus: (input) =>
       detectGitRepositoryForStatus("GitWorkflowService.localStatus", input.cwd).pipe(
         Effect.flatMap((isGitRepository) =>
-          isGitRepository
+          isGitRepository === true
             ? gitManager.localStatus(input)
-            : Effect.succeed(nonRepositoryLocalStatus()),
+            : Effect.succeed(
+                nonRepositoryLocalStatus(isGitRepository === "directory" ? "directory" : undefined),
+              ),
         ),
       ),
     remoteStatus: (input, options) =>
       detectGitRepositoryForStatus("GitWorkflowService.remoteStatus", input.cwd).pipe(
         Effect.flatMap((isGitRepository) =>
-          isGitRepository ? gitManager.remoteStatus(input, options) : Effect.succeed(null),
+          isGitRepository === true ? gitManager.remoteStatus(input, options) : Effect.succeed(null),
         ),
       ),
     invalidateLocalStatus: gitManager.invalidateLocalStatus,

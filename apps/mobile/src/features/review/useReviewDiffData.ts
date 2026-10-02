@@ -147,6 +147,7 @@ export function useReviewDiffData(input: {
   const scope = JSON.stringify([
     environmentId,
     cwd,
+    source?.repository?.id,
     source?.kind,
     source?.baseRef,
     source?.diffHash,
@@ -168,6 +169,7 @@ export function useReviewDiffData(input: {
                     cacheKey: scope,
                     request: {
                       cwd,
+                      ...(lazySource.repository ? { repositoryId: lazySource.repository.id } : {}),
                       ...(lazySource.baseRef ? { baseRef: lazySource.baseRef } : {}),
                       file: {
                         path: file.path,

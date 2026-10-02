@@ -96,6 +96,8 @@ import * as VcsStatusBroadcaster from "./vcs/VcsStatusBroadcaster.ts";
 import * as ProjectCloneTracker from "./project/ProjectCloneTracker.ts";
 import * as GitWorkflowService from "./git/GitWorkflowService.ts";
 import * as ReviewService from "./review/ReviewService.ts";
+import * as ReviewWorkspaceRoots from "./review/ReviewWorkspaceRoots.ts";
+import * as RepositoryDiscovery from "./workspace/RepositoryDiscovery.ts";
 import * as SourceControlProviderRegistry from "./sourceControl/SourceControlProviderRegistry.ts";
 import * as PullRequestReadCache from "./pullRequest/PullRequestReadCache.ts";
 import * as SourceControlRateLimit from "./sourceControl/SourceControlRateLimit.ts";
@@ -334,7 +336,12 @@ const layerGit = Layer.empty.pipe(
   Layer.provideMerge(GitVcsDriver.layer),
 );
 
+const layerRepositoryDiscovery = RepositoryDiscovery.layer.pipe(
+  Layer.provide(GitVcsDriver.layer),
+);
+
 const layerGitWorkflow = GitWorkflowService.layer.pipe(
+  Layer.provide(layerRepositoryDiscovery),
   Layer.provideMerge(layerVcsDriverRegistry),
   Layer.provideMerge(layerGit),
 );
@@ -349,6 +356,8 @@ const layerProjectCloneTracker = ProjectCloneTracker.layer.pipe(
 );
 
 const layerReview = ReviewService.layer.pipe(
+  Layer.provide(ReviewWorkspaceRoots.layer.pipe(Layer.provide(ProjectStore.layer))),
+  Layer.provide(layerRepositoryDiscovery),
   Layer.provideMerge(GitVcsDriver.layer),
   Layer.provideMerge(layerVcsDriverRegistry),
 );
@@ -356,7 +365,12 @@ const layerReview = ReviewService.layer.pipe(
 const layerVcs = Layer.empty.pipe(
   Layer.provideMerge(VcsProjectConfig.layer),
   Layer.provideMerge(layerVcsDriverRegistry),
-  Layer.provideMerge(VcsProvisioningService.layer.pipe(Layer.provide(layerVcsDriverRegistry))),
+  Layer.provideMerge(
+    VcsProvisioningService.layer.pipe(
+      Layer.provide(layerRepositoryDiscovery),
+      Layer.provide(layerVcsDriverRegistry),
+    ),
+  ),
   Layer.provideMerge(layerGitWorkflow),
   Layer.provideMerge(layerReview),
   Layer.provideMerge(layerSourceControlRepositoryService),

@@ -1,4 +1,8 @@
-import type { VcsStatusRemoteResult, VcsStatusResult } from "@t3tools/contracts";
+import type {
+  VcsStatusLocalResult,
+  VcsStatusRemoteResult,
+  VcsStatusResult,
+} from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -231,6 +235,21 @@ describe("isTemporaryWorktreeBranch", () => {
 });
 
 describe("applyGitStatusStreamEvent", () => {
+  it("preserves repository folder review through remote status updates", () => {
+    const local: VcsStatusLocalResult = {
+      isRepo: false,
+      workspaceKind: "directory",
+      hasPrimaryRemote: false,
+      isDefaultRef: false,
+      refName: null,
+      hasWorkingTreeChanges: false,
+      workingTree: { files: [], insertions: 0, deletions: 0 },
+    };
+    const current = applyGitStatusStreamEvent(null, { _tag: "localUpdated", local });
+    const next = applyGitStatusStreamEvent(current, { _tag: "remoteUpdated", remote: null });
+    expect(next?.workspaceKind).toBe("directory");
+    expect(next?.isRepo).toBe(false);
+  });
   it("treats a remote-only update as a repository when local state is missing", () => {
     const remote: VcsStatusRemoteResult = {
       hasUpstream: true,

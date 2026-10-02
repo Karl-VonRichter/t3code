@@ -18,6 +18,7 @@ import { resolveFileDiffPath } from "./diffRendering";
 interface GitDiffFileContentsSource {
   readonly environmentId: EnvironmentId;
   readonly cwd: string;
+  readonly repositoryId?: string;
   readonly sourceKind: ReviewDiffPreviewSourceKind;
   readonly baseRef: string | null;
   readonly headRef: string | null;
@@ -85,6 +86,7 @@ export function createGitDiffFileContentsLoader<E>(
       environmentId: source.environmentId,
       input: {
         cwd: source.cwd,
+        ...(source.repositoryId ? { repositoryId: source.repositoryId } : {}),
         sourceKind: source.sourceKind,
         changeType,
         baseRef: source.baseRef,

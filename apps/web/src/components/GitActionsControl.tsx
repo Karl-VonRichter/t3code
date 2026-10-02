@@ -1722,6 +1722,7 @@ export default function GitActionsControl({
   );
 
   if (!gitCwd) return null;
+  if (gitStatusForActions?.workspaceKind === "directory") return null;
 
   return (
     <>

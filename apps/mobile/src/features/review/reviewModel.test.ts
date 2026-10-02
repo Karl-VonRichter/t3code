@@ -45,6 +45,32 @@ function makeRenderableFile(
 }
 
 describe("buildReviewSectionItems", () => {
+  it("keeps repository review selections separate even for identical Git scopes", () => {
+    const gitSections: ReviewDiffPreviewSource[] = ["app", "platform"].map((id) => ({
+      id: `${id}:working-tree`,
+      kind: "working-tree",
+      title: `${id} · Dirty worktree`,
+      repository: { id, path: id === "app" ? "app" : "platform" },
+      baseRef: "HEAD",
+      headRef: null,
+      diff: "",
+      diffHash: `hash-${id}`,
+      truncated: true,
+      files: [{ path: `${id}/file.txt`, previousPath: null, additions: 1, deletions: 1 }],
+    }));
+    const items = buildReviewSectionItems({
+      checkpoints: [],
+      gitSections,
+      turnDiffById: {},
+      loadingTurnIds: {},
+      loadingGitSections: false,
+    });
+    expect(items.map((item) => item.id)).toEqual([
+      "git:app:working-tree",
+      "git:platform:working-tree",
+    ]);
+    expect(items[1]?.source?.repository?.path).toBe("platform");
+  });
   it("keeps one chip per checkpoint and appends git sources", () => {
     const checkpoints = [
       makeCheckpoint({

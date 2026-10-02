@@ -119,6 +119,7 @@ function useThreadGitControlModel(props: ThreadGitMenuProps) {
   const currentBranchLabel = gitStatus?.refName ?? props.currentBranch ?? "Detached HEAD";
   const busy = gitOperationLabel !== null;
   const isRepo = gitStatus?.isRepo ?? true;
+  const canReviewWorkspace = isRepo || gitStatus?.workspaceKind === "directory";
   const hasPrimaryRemote = gitStatus?.hasPrimaryRemote ?? false;
   const isDefaultRef = gitStatus?.isDefaultRef ?? false;
 
@@ -240,6 +241,7 @@ function useThreadGitControlModel(props: ThreadGitMenuProps) {
   return {
     currentBranchLabel,
     isRepo,
+    canReviewWorkspace,
     openFiles,
     openGitInspector,
     openReview,
@@ -350,7 +352,7 @@ function useThreadGitHeaderActionItems(props: ThreadGitControlsProps): ThreadGit
             },
             {
               description: "Turn diffs and worktree changes",
-              disabled: !model.isRepo,
+              disabled: !model.canReviewWorkspace,
               icon: { name: "text.bubble", type: "sfSymbol" },
               label: "Review changes",
               onPress: model.openReview,
@@ -385,6 +387,7 @@ function useThreadGitHeaderActionItems(props: ThreadGitControlsProps): ThreadGit
     [
       model.currentBranchLabel,
       model.isRepo,
+      model.canReviewWorkspace,
       model.openFiles,
       model.openGitInspector,
       model.openReview,
@@ -557,7 +560,7 @@ function threadGitMenuDefinition(
         id: "git-review",
         title: "Review changes",
         icon: "text.bubble",
-        disabled: !model.isRepo,
+        disabled: !model.canReviewWorkspace,
         subtitle: "Turn diffs and worktree changes",
         onPress: model.openReview,
       },

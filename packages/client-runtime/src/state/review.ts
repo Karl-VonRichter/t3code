@@ -62,6 +62,7 @@ export function createReviewEnvironmentAtoms<R, E>(
           JSON.stringify([
             environmentId,
             input.cwd,
+            input.repositoryId,
             input.sourceKind,
             input.baseRef,
             input.headRef,

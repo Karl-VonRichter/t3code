@@ -30,6 +30,7 @@ export function useReviewFilePatches({
   const scope = JSON.stringify([
     environmentId,
     cwd,
+    source?.repository?.id,
     source?.kind,
     source?.diffHash,
     baseRef,
@@ -63,6 +64,7 @@ export function useReviewFilePatches({
                     cacheKey: scope,
                     request: {
                       cwd,
+                      ...(source.repository ? { repositoryId: source.repository.id } : {}),
                       ...(baseRef ? { baseRef } : {}),
                       ignoreWhitespace,
                       file: {
