@@ -2405,6 +2405,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
 
   const getReviewDiffPreview = Effect.fn("getReviewDiffPreview")(function* (
     input: ReviewDiffPreviewInput,
+    options?: { readonly pathPrefix?: string; readonly metadataOnly?: boolean },
   ) {
     const pathArgs = input.file
       ? [input.file.path, ...(input.file.previousPath ? [input.file.previousPath] : [])].map(
@@ -2443,7 +2444,9 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       "--no-ext-diff",
       "--no-textconv",
       "--minimal",
-      ...PATCH_RENDER_PREFIX_ARGS,
+      ...(options?.pathPrefix
+        ? [`--src-prefix=a/${options.pathPrefix}/`, `--dst-prefix=b/${options.pathPrefix}/`]
+        : PATCH_RENDER_PREFIX_ARGS),
       ...(input.ignoreWhitespace ? ["--ignore-all-space"] : []),
     ];
     const readStats = Effect.fn("GitVcsDriver.getReviewDiffPreview.stat")(function* (
@@ -2488,6 +2491,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       if (ref === null) return { stdout: "", stdoutTruncated: false, files: [] };
       const stat = yield* readStats(ref, env);
       if (stat.files.length === 0) return { stdout: "", stdoutTruncated: false, files: [] };
+      if (options?.metadataOnly) return { stdout: "", stdoutTruncated: true, files: stat.files };
       const patch = yield* executeGit(
         "GitVcsDriver.getReviewDiffPreview.patch",
         cwd,
@@ -2537,7 +2541,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       [
         readDirty,
         readTrackedDiff(
-          baseRef && branch && input.file?.sourceKind !== "working-tree"
+          baseRef && (branch || input.baseRef) && input.file?.sourceKind !== "working-tree"
             ? `${baseRef}...HEAD`
             : null,
         ),

@@ -3,18 +3,29 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 
 import { VcsRepositoryDetectionError } from "@t3tools/contracts";
 
 import * as GitManager from "./GitManager.ts";
 import * as GitWorkflowService from "./GitWorkflowService.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
+import * as RepositoryDiscovery from "../workspace/RepositoryDiscovery.ts";
 import * as VcsDriverRegistry from "../vcs/VcsDriverRegistry.ts";
 
 function makeLayer(input: {
+  readonly container?: boolean;
   readonly detect: VcsDriverRegistry.VcsDriverRegistry["Service"]["detect"];
 }) {
   return GitWorkflowService.layer.pipe(
+    Layer.provide(
+      Layer.mock(RepositoryDiscovery.RepositoryDiscovery)({
+        isContainer: () => Effect.succeed(input.container ?? false),
+      }),
+    ),
+    Layer.provide(NodeServices.layer),
     Layer.provide(
       Layer.mock(VcsDriverRegistry.VcsDriverRegistry)({
         detect: input.detect,
@@ -26,6 +37,33 @@ function makeLayer(input: {
 }
 
 describe("GitWorkflowService", () => {
+  it.effect(
+    "advertises repository folder review without treating the root as a Git repository",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-folder-status-" });
+        yield* fs.makeDirectory(path.join(root, "app", ".git"), { recursive: true });
+        yield* Effect.gen(function* () {
+          const workflow = yield* GitWorkflowService.GitWorkflowService;
+          const status = yield* workflow.localStatus({ cwd: root });
+          assert.strictEqual(status.isRepo, false);
+          assert.strictEqual(status.workspaceKind, "directory");
+          assert.strictEqual((yield* workflow.status({ cwd: root })).workspaceKind, "directory");
+          assert.strictEqual(yield* workflow.isRepository(root), false);
+          assert.strictEqual(yield* workflow.remoteStatus({ cwd: root }), null);
+        }).pipe(
+          Effect.provide(
+            makeLayer({
+              container: true,
+              detect: () =>
+                Effect.die("repository folders must not fall through to a parent Git repository"),
+            }),
+          ),
+        );
+      }).pipe(Effect.provide(NodeServices.layer)),
+  );
   it.effect("reports a non-Git VCS repository as not a Git repository", () =>
     Effect.gen(function* () {
       const workflow = yield* GitWorkflowService.GitWorkflowService;
@@ -118,6 +156,12 @@ describe("GitWorkflowService", () => {
     const status = vi.fn();
 
     const testLayer = GitWorkflowService.layer.pipe(
+      Layer.provide(
+        Layer.mock(RepositoryDiscovery.RepositoryDiscovery)({
+          isContainer: () => Effect.succeed(false),
+        }),
+      ),
+      Layer.provide(NodeServices.layer),
       Layer.provide(
         Layer.mock(VcsDriverRegistry.VcsDriverRegistry)({
           detect: () => Effect.succeed(null),

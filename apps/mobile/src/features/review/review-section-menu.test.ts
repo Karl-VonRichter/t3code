@@ -26,6 +26,8 @@ describe("buildReviewSectionMenu", () => {
       branchChanges,
       latestTurn: turn28,
       turns: [turn28, turn27],
+      repositories: [],
+      otherRepositories: [],
     });
   });
 
@@ -35,6 +37,45 @@ describe("buildReviewSectionMenu", () => {
       branchChanges: null,
       latestTurn: null,
       turns: [],
+      repositories: [],
+      otherRepositories: [],
     });
+  });
+
+  it("lists repository scopes once and keeps both scopes together for changed members", () => {
+    const repositorySection = (
+      repositoryId: string,
+      kind: "working-tree" | "branch-range",
+      changed: boolean,
+    ): ReviewSectionItem => {
+      const id = `${repositoryId}:${kind}`;
+      const files = changed
+        ? [{ path: `${repositoryId}/file.txt`, previousPath: null, additions: 1, deletions: 0 }]
+        : [];
+      return {
+        ...section(id, kind),
+        files,
+        source: {
+          id,
+          kind,
+          title: id,
+          repository: { id: repositoryId, path: repositoryId },
+          baseRef: null,
+          headRef: null,
+          diff: "",
+          diffHash: id,
+          truncated: true,
+          files,
+        },
+      };
+    };
+    const working = repositorySection("app", "working-tree", true);
+    const branch = repositorySection("app", "branch-range", false);
+    const clean = repositorySection("vendor", "working-tree", false);
+    const menu = buildReviewSectionMenu([working, branch, clean]);
+    expect(menu.workingTree).toBeNull();
+    expect(menu.branchChanges).toBeNull();
+    expect(menu.repositories).toEqual([working, branch]);
+    expect(menu.otherRepositories).toEqual([clean]);
   });
 });

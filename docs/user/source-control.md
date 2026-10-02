@@ -3,6 +3,21 @@
 T3 Code integrates with GitHub, GitLab, Forgejo, Gitea, Bitbucket, and Azure DevOps to clone and publish
 repositories, create pull requests, and review changes.
 
+## Review a folder containing repositories
+
+Add the parent folder of your Git repositories as a project. Review discovers repositories
+under that folder, including nested repositories, submodules, and Git worktrees. Expand a
+repository and select a file to review its working changes or compare commits against its base branch. Paths
+include each repository’s location in the project; changed repositories appear first.
+
+Each repository uses its own Git comparison base. You can select a different branch or
+commit in review. Detached checkouts display their current commit. Git metadata, build
+output, installed dependencies, and directory symlinks are excluded from discovery.
+
+This supports review in the existing folder. Isolated tasks and turn checkpoints across
+repositories are not available yet. Commit, push, and pull request controls continue to
+operate on an individual Git repository.
+
 ## Connect an account
 
 Install Git and configure authentication on the machine running your T3 Code server. For a remote

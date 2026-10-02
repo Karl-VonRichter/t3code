@@ -2,9 +2,11 @@ import * as Schema from "effect/Schema";
 import { TrimmedNonEmptyString } from "./baseSchemas.ts";
 import { GitCommandError } from "./git.ts";
 import { VcsError } from "./vcs.ts";
+import { RepositoryWorkspace, WorkspaceDiscoveryError } from "./workspace.ts";
 
 export const ReviewDiffPreviewInput = Schema.Struct({
   cwd: TrimmedNonEmptyString,
+  repositoryId: Schema.optionalKey(TrimmedNonEmptyString),
   baseRef: Schema.optional(TrimmedNonEmptyString),
   ignoreWhitespace: Schema.optionalKey(Schema.Boolean),
   file: Schema.optionalKey(
@@ -37,6 +39,12 @@ export const ReviewDiffPreviewSource = Schema.Struct({
   diff: Schema.String,
   diffHash: TrimmedNonEmptyString,
   truncated: Schema.Boolean,
+  repository: Schema.optionalKey(
+    Schema.Struct({
+      id: TrimmedNonEmptyString,
+      path: TrimmedNonEmptyString,
+    }),
+  ),
   /** Complete statistics, independent of patch limits. Absent on older servers. */
   files: Schema.optionalKey(Schema.Array(ReviewDiffFileStat)),
 });
@@ -44,6 +52,7 @@ export type ReviewDiffPreviewSource = typeof ReviewDiffPreviewSource.Type;
 
 export const ReviewDiffFileContentsInput = Schema.Struct({
   cwd: TrimmedNonEmptyString,
+  repositoryId: Schema.optionalKey(TrimmedNonEmptyString),
   sourceKind: ReviewDiffPreviewSourceKind,
   changeType: Schema.Literals(["change", "rename-pure", "rename-changed", "new", "deleted"]),
   baseRef: Schema.NullOr(TrimmedNonEmptyString),
@@ -63,8 +72,13 @@ export const ReviewDiffPreviewResult = Schema.Struct({
   cwd: TrimmedNonEmptyString,
   generatedAt: Schema.DateTimeUtc,
   sources: Schema.Array(ReviewDiffPreviewSource),
+  workspace: Schema.optionalKey(RepositoryWorkspace),
 });
 export type ReviewDiffPreviewResult = typeof ReviewDiffPreviewResult.Type;
 
-export const ReviewDiffPreviewError = Schema.Union([VcsError, GitCommandError]);
+export const ReviewDiffPreviewError = Schema.Union([
+  VcsError,
+  GitCommandError,
+  WorkspaceDiscoveryError,
+]);
 export type ReviewDiffPreviewError = typeof ReviewDiffPreviewError.Type;

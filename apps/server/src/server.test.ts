@@ -179,6 +179,8 @@ import * as GitHubCli from "./sourceControl/GitHubCli.ts";
 import * as VcsProcess from "./vcs/VcsProcess.ts";
 import * as GitWorkflowService from "./git/GitWorkflowService.ts";
 import * as ReviewService from "./review/ReviewService.ts";
+import * as ReviewWorkspaceRoots from "./review/ReviewWorkspaceRoots.ts";
+import * as RepositoryDiscovery from "./workspace/RepositoryDiscovery.ts";
 import * as SourceControlRepositoryService from "./sourceControl/SourceControlRepositoryService.ts";
 import { REPLAY_MARKER_MAX_AGE } from "./auth/replayMarkers.ts";
 import * as ServerSecretStore from "./auth/ServerSecretStore.ts";
@@ -734,12 +736,17 @@ const buildAppUnderTest = (options?: {
       ),
       NativeAppIconResolver.layer,
     );
+    const repositoryDiscoveryLayer = RepositoryDiscovery.layer.pipe(
+      Layer.provide(gitVcsDriverLayer),
+    );
     const gitWorkflowLayer = GitWorkflowService.layer.pipe(
+      Layer.provide(repositoryDiscoveryLayer),
       Layer.provideMerge(vcsDriverRegistryLayer),
       Layer.provideMerge(gitVcsDriverLayer),
       Layer.provideMerge(gitManagerLayer),
     );
     const vcsProvisioningLayer = VcsProvisioningService.layer.pipe(
+      Layer.provide(repositoryDiscoveryLayer),
       Layer.provide(vcsDriverRegistryLayer),
     );
     const reviewLayer = options?.layers?.reviewService
@@ -747,6 +754,8 @@ const buildAppUnderTest = (options?: {
           ...options.layers.reviewService,
         })
       : ReviewService.layer.pipe(
+          Layer.provide(ReviewWorkspaceRoots.layer),
+          Layer.provide(repositoryDiscoveryLayer),
           Layer.provideMerge(gitVcsDriverLayer),
           Layer.provide(vcsDriverRegistryLayer),
         );
