@@ -146,6 +146,28 @@ function ReviewHeader(
                         },
                       ]
                     : []),
+                  ...(props.sectionMenu.repositories.length > 0
+                    ? [
+                        {
+                          id: "repositories",
+                          title: "Repositories",
+                          items: props.sectionMenu.repositories.map((section) =>
+                            sectionAction(section, section.title),
+                          ),
+                        },
+                      ]
+                    : []),
+                  ...(props.sectionMenu.otherRepositories.length > 0
+                    ? [
+                        {
+                          id: "other-repositories",
+                          title: "Unchanged repositories",
+                          items: props.sectionMenu.otherRepositories.map((section) =>
+                            sectionAction(section, section.title),
+                          ),
+                        },
+                      ]
+                    : []),
                   ...(presentation.refreshAction ? [presentation.refreshAction] : []),
                 ],
               },

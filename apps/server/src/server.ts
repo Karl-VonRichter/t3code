@@ -114,6 +114,8 @@ import * as VcsStatusBroadcaster from "./vcs/VcsStatusBroadcaster.ts";
 import * as ProjectCloneTracker from "./project/ProjectCloneTracker.ts";
 import * as GitWorkflowService from "./git/GitWorkflowService.ts";
 import * as ReviewService from "./review/ReviewService.ts";
+import * as ReviewWorkspaceRoots from "./review/ReviewWorkspaceRoots.ts";
+import * as RepositoryDiscovery from "./workspace/RepositoryDiscovery.ts";
 import * as SourceControlProviderRegistry from "./sourceControl/SourceControlProviderRegistry.ts";
 import * as PullRequestReadCache from "./pullRequest/PullRequestReadCache.ts";
 import * as SourceControlRateLimit from "./sourceControl/SourceControlRateLimit.ts";
@@ -371,7 +373,12 @@ const GitLayerLive = Layer.empty.pipe(
   Layer.provideMerge(GitVcsDriver.layer),
 );
 
+const RepositoryDiscoveryLayerLive = RepositoryDiscovery.layer.pipe(
+  Layer.provide(GitVcsDriver.layer),
+);
+
 const GitWorkflowLayerLive = GitWorkflowService.layer.pipe(
+  Layer.provide(RepositoryDiscoveryLayerLive),
   Layer.provideMerge(VcsDriverRegistryLayerLive),
   Layer.provideMerge(GitLayerLive),
 );
@@ -386,6 +393,8 @@ const ProjectCloneTrackerLayerLive = ProjectCloneTracker.layer.pipe(
 );
 
 const ReviewLayerLive = ReviewService.layer.pipe(
+  Layer.provide(ReviewWorkspaceRoots.layer.pipe(Layer.provide(SqlitePersistenceLayerLive))),
+  Layer.provide(RepositoryDiscoveryLayerLive),
   Layer.provideMerge(GitVcsDriver.layer),
   Layer.provideMerge(VcsDriverRegistryLayerLive),
 );
@@ -393,7 +402,12 @@ const ReviewLayerLive = ReviewService.layer.pipe(
 const VcsLayerLive = Layer.empty.pipe(
   Layer.provideMerge(VcsProjectConfig.layer),
   Layer.provideMerge(VcsDriverRegistryLayerLive),
-  Layer.provideMerge(VcsProvisioningService.layer.pipe(Layer.provide(VcsDriverRegistryLayerLive))),
+  Layer.provideMerge(
+    VcsProvisioningService.layer.pipe(
+      Layer.provide(RepositoryDiscoveryLayerLive),
+      Layer.provide(VcsDriverRegistryLayerLive),
+    ),
+  ),
   Layer.provideMerge(GitWorkflowLayerLive),
   Layer.provideMerge(ReviewLayerLive),
   Layer.provideMerge(SourceControlRepositoryServiceLayerLive),

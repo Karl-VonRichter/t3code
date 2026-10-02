@@ -432,7 +432,7 @@ export function buildReviewSectionItems(input: {
   );
 
   const gitItems = input.gitSections.map<ReviewSectionItem>((section) => ({
-    id: `git:${section.kind}`,
+    id: `git:${section.repository ? section.id : section.kind}`,
     kind: section.kind,
     title: section.title,
     subtitle: gitSubtitle(section),
@@ -442,7 +442,7 @@ export function buildReviewSectionItems(input: {
     truncated: section.truncated,
     isLoading: false,
   }));
-  const hasDirtyWorktreeItem = gitItems.some((item) => item.id === DIRTY_WORKTREE_SECTION_ID);
+  const hasDirtyWorktreeItem = gitItems.some((item) => item.kind === "working-tree");
   const visibleGitItems =
     input.loadingGitSections && !hasDirtyWorktreeItem
       ? [

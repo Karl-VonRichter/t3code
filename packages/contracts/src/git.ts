@@ -212,6 +212,8 @@ const VcsStatusChangeRequest = Schema.Struct({
 
 const VcsStatusLocalShape = {
   isRepo: Schema.Boolean,
+  /** A folder containing repositories is reviewable without being a Git repository. */
+  workspaceKind: Schema.optionalKey(Schema.Literal("directory")),
   sourceControlProvider: Schema.optional(SourceControlProviderInfo),
   hasPrimaryRemote: Schema.Boolean,
   isDefaultRef: Schema.Boolean,
