@@ -39,6 +39,8 @@ import {
 } from "./GitVcsDriverCore.ts";
 import * as VcsDriver from "./VcsDriver.ts";
 import * as VcsProcess from "./VcsProcess.ts";
+import { quoteGitPatchPath, unquoteGitPatchPath } from "@t3tools/shared/gitPatchPath";
+import { parseTurnDiffFilesFromNumstat } from "../checkpointing/Diffs.ts";
 
 export interface ExecuteGitInput {
   readonly operation: string;
@@ -1170,6 +1172,9 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
           "--no-ext-diff",
           "--no-textconv",
           ...PATCH_RENDER_PREFIX_ARGS,
+          ...(input.pathPrefix
+            ? [`--src-prefix=a/${input.pathPrefix}`, `--dst-prefix=b/${input.pathPrefix}`]
+            : []),
           ...(input.ignoreWhitespace ? ["--ignore-all-space"] : []),
           `${fromRevision}^{commit}`,
           `${input.toCheckpointRef}^{commit}`,
@@ -1189,7 +1194,18 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
         });
       }
 
-      return result.stdout;
+      if (!input.pathPrefix) return result.stdout;
+      if (input.format === "numstat") {
+        return parseTurnDiffFilesFromNumstat(result.stdout)
+          .map((file) => `${file.additions}\t${file.deletions}\t${input.pathPrefix}${file.path}\0`)
+          .join("");
+      }
+      // Git's rename/copy headers omit --src-prefix/--dst-prefix, unlike its file headers.
+      return result.stdout.replace(
+        /^(rename from|rename to|copy from|copy to) (.+)$/gm,
+        (_line, header: string, token: string) =>
+          `${header} ${quoteGitPatchPath(`${input.pathPrefix}${unquoteGitPatchPath(token)}`)}`,
+      );
     }),
 
     deleteCheckpointRefs: Effect.fn("GitVcsDriver.checkpoints.deleteCheckpointRefs")(

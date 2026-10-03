@@ -8,7 +8,7 @@ import { describe, expect } from "vite-plus/test";
 import * as ProjectionSnapshotQuery from "../orchestration/Services/ProjectionSnapshotQuery.ts";
 import { checkpointRefForThreadTurn } from "./Utils.ts";
 import * as CheckpointDiffQuery from "./CheckpointDiffQuery.ts";
-import * as CheckpointStore from "./CheckpointStore.ts";
+import * as WorkspaceCheckpointStore from "./WorkspaceCheckpointStore.ts";
 import { CheckpointThreadNotFoundError } from "./Errors.ts";
 
 function makeThreadCheckpointContext(input: {
@@ -53,8 +53,8 @@ describe("CheckpointDiffQuery.layer", () => {
         readonly ignoreWhitespace: boolean;
       }> = [];
 
-      const checkpointStore: CheckpointStore.CheckpointStore["Service"] = {
-        isGitRepository: () => Effect.succeed(true),
+      const checkpointStore: WorkspaceCheckpointStore.WorkspaceCheckpointStore["Service"] = {
+        isCheckpointWorkspace: () => Effect.succeed(true),
         captureCheckpoint: () => Effect.void,
         hasCheckpointRef: () => Effect.succeed(true),
         restoreCheckpoint: () => Effect.succeed(true),
@@ -72,7 +72,9 @@ describe("CheckpointDiffQuery.layer", () => {
       };
 
       const layer = CheckpointDiffQuery.layer.pipe(
-        Layer.provideMerge(Layer.succeed(CheckpointStore.CheckpointStore, checkpointStore)),
+        Layer.provideMerge(
+          Layer.succeed(WorkspaceCheckpointStore.WorkspaceCheckpointStore, checkpointStore),
+        ),
         Layer.provideMerge(
           Layer.succeed(ProjectionSnapshotQuery.ProjectionSnapshotQuery, {
             getUserInputActivity: () => Effect.die("unused"),
@@ -171,8 +173,8 @@ describe("CheckpointDiffQuery.layer", () => {
         checkpointRef: toCheckpointRef,
       });
 
-      const checkpointStore: CheckpointStore.CheckpointStore["Service"] = {
-        isGitRepository: () => Effect.succeed(true),
+      const checkpointStore: WorkspaceCheckpointStore.WorkspaceCheckpointStore["Service"] = {
+        isCheckpointWorkspace: () => Effect.succeed(true),
         captureCheckpoint: () => Effect.void,
         hasCheckpointRef: () => Effect.succeed(true),
         restoreCheckpoint: () => Effect.succeed(true),
@@ -190,7 +192,9 @@ describe("CheckpointDiffQuery.layer", () => {
       };
 
       const layer = CheckpointDiffQuery.layer.pipe(
-        Layer.provideMerge(Layer.succeed(CheckpointStore.CheckpointStore, checkpointStore)),
+        Layer.provideMerge(
+          Layer.succeed(WorkspaceCheckpointStore.WorkspaceCheckpointStore, checkpointStore),
+        ),
         Layer.provideMerge(
           Layer.succeed(ProjectionSnapshotQuery.ProjectionSnapshotQuery, {
             getUserInputActivity: () => Effect.die("unused"),
@@ -269,8 +273,8 @@ describe("CheckpointDiffQuery.layer", () => {
         checkpointRef: toCheckpointRef,
       });
 
-      const checkpointStore: CheckpointStore.CheckpointStore["Service"] = {
-        isGitRepository: () => Effect.succeed(true),
+      const checkpointStore: WorkspaceCheckpointStore.WorkspaceCheckpointStore["Service"] = {
+        isCheckpointWorkspace: () => Effect.succeed(true),
         captureCheckpoint: () => Effect.void,
         hasCheckpointRef: () => Effect.succeed(true),
         restoreCheckpoint: () => Effect.succeed(true),
@@ -283,7 +287,9 @@ describe("CheckpointDiffQuery.layer", () => {
       };
 
       const layer = CheckpointDiffQuery.layer.pipe(
-        Layer.provideMerge(Layer.succeed(CheckpointStore.CheckpointStore, checkpointStore)),
+        Layer.provideMerge(
+          Layer.succeed(WorkspaceCheckpointStore.WorkspaceCheckpointStore, checkpointStore),
+        ),
         Layer.provideMerge(
           Layer.succeed(ProjectionSnapshotQuery.ProjectionSnapshotQuery, {
             getUserInputActivity: () => Effect.die("unused"),
@@ -347,8 +353,8 @@ describe("CheckpointDiffQuery.layer", () => {
         checkpointRef: toCheckpointRef,
       });
 
-      const checkpointStore: CheckpointStore.CheckpointStore["Service"] = {
-        isGitRepository: () => Effect.succeed(true),
+      const checkpointStore: WorkspaceCheckpointStore.WorkspaceCheckpointStore["Service"] = {
+        isCheckpointWorkspace: () => Effect.succeed(true),
         captureCheckpoint: () => Effect.void,
         hasCheckpointRef: () =>
           Effect.sync(() => {
@@ -361,7 +367,9 @@ describe("CheckpointDiffQuery.layer", () => {
       };
 
       const layer = CheckpointDiffQuery.layer.pipe(
-        Layer.provideMerge(Layer.succeed(CheckpointStore.CheckpointStore, checkpointStore)),
+        Layer.provideMerge(
+          Layer.succeed(WorkspaceCheckpointStore.WorkspaceCheckpointStore, checkpointStore),
+        ),
         Layer.provideMerge(
           Layer.succeed(ProjectionSnapshotQuery.ProjectionSnapshotQuery, {
             getUserInputActivity: () => Effect.die("unused"),
@@ -414,8 +422,8 @@ describe("CheckpointDiffQuery.layer", () => {
     Effect.gen(function* () {
       const threadId = ThreadId.make("thread-missing");
 
-      const checkpointStore: CheckpointStore.CheckpointStore["Service"] = {
-        isGitRepository: () => Effect.succeed(true),
+      const checkpointStore: WorkspaceCheckpointStore.WorkspaceCheckpointStore["Service"] = {
+        isCheckpointWorkspace: () => Effect.succeed(true),
         captureCheckpoint: () => Effect.void,
         hasCheckpointRef: () => Effect.succeed(true),
         restoreCheckpoint: () => Effect.succeed(true),
@@ -424,7 +432,9 @@ describe("CheckpointDiffQuery.layer", () => {
       };
 
       const layer = CheckpointDiffQuery.layer.pipe(
-        Layer.provideMerge(Layer.succeed(CheckpointStore.CheckpointStore, checkpointStore)),
+        Layer.provideMerge(
+          Layer.succeed(WorkspaceCheckpointStore.WorkspaceCheckpointStore, checkpointStore),
+        ),
         Layer.provideMerge(
           Layer.succeed(ProjectionSnapshotQuery.ProjectionSnapshotQuery, {
             getUserInputActivity: () => Effect.die("unused"),

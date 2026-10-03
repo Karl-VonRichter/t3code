@@ -37,6 +37,9 @@ import { it as effectIt } from "@effect/vitest";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import * as CheckpointStore from "../../checkpointing/CheckpointStore.ts";
+import * as WorkspaceCheckpointStore from "../../checkpointing/WorkspaceCheckpointStore.ts";
+import * as RepositoryDiscovery from "../../workspace/RepositoryDiscovery.ts";
+import * as GitVcsDriver from "../../vcs/GitVcsDriver.ts";
 import * as VcsDriverRegistry from "../../vcs/VcsDriverRegistry.ts";
 import * as VcsProcess from "../../vcs/VcsProcess.ts";
 import { VcsStatusBroadcaster } from "../../vcs/VcsStatusBroadcaster.ts";
@@ -299,6 +302,7 @@ describe("CheckpointReactor", () => {
     readonly hasSession?: boolean;
     readonly seedFilesystemCheckpoints?: boolean;
     readonly initializeGit?: boolean;
+    readonly repositoryFolder?: boolean;
     readonly projectWorkspaceRoot?: string;
     readonly threadWorktreePath?: string | null;
     readonly threadBranch?: string | null;
@@ -312,6 +316,12 @@ describe("CheckpointReactor", () => {
     readonly pullRequestRefresh?: Effect.Effect<void>;
   }) {
     const cwd = createGitRepository();
+    if (options?.repositoryFolder) {
+      NodeFS.rmSync(NodePath.join(cwd, ".git"), { recursive: true });
+      NodeFS.mkdirSync(NodePath.join(cwd, "deps"));
+      NodeFS.renameSync(createGitRepository(), NodePath.join(cwd, "sdk"));
+      NodeFS.renameSync(createGitRepository(), NodePath.join(cwd, "deps", "library"));
+    }
     if (options?.initializeGit === false) {
       NodeFS.rmSync(NodePath.join(cwd, ".git"), { recursive: true });
     }
@@ -376,6 +386,11 @@ describe("CheckpointReactor", () => {
       Layer.provideMerge(Layer.succeed(ProviderService, provider.service)),
       Layer.provideMerge(Layer.mock(PullRequestService)({ refreshAfterTurn })),
       Layer.provideMerge(vcsStatusBroadcasterLayer),
+      Layer.provideMerge(
+        WorkspaceCheckpointStore.layer.pipe(
+          Layer.provide(RepositoryDiscovery.layer.pipe(Layer.provide(GitVcsDriver.layer))),
+        ),
+      ),
       Layer.provideMerge(
         Layer.effect(
           CheckpointStore.CheckpointStore,
@@ -518,6 +533,105 @@ describe("CheckpointReactor", () => {
       pullRequestRefreshes,
     };
   }
+
+  effectIt.effect("finalizes repository-folder turns with qualified paths and typed receipts", () =>
+    Effect.gen(function* () {
+      const harness = yield* Effect.promise(() =>
+        createHarness({
+          repositoryFolder: true,
+          seedFilesystemCheckpoints: false,
+          threadWorktreePath: null,
+        }),
+      );
+      const threadId = ThreadId.make("thread-1");
+      const turnId = asTurnId("turn-folder");
+      harness.provider.emit({
+        type: "turn.started",
+        eventId: EventId.make("folder-start"),
+        provider: ProviderDriverKind.make("codex"),
+        createdAt: "2026-01-01T00:00:00.000Z",
+        threadId,
+        turnId,
+      });
+      expect(yield* harness.nextReceipt).toMatchObject({
+        type: "checkpoint.baseline.captured",
+        checkpointTurnCount: 0,
+      });
+      NodeFS.writeFileSync(NodePath.join(harness.cwd, "sdk", "README.md"), "sdk change\n");
+      NodeFS.writeFileSync(
+        NodePath.join(harness.cwd, "deps", "library", "README.md"),
+        "library change\n",
+      );
+      harness.provider.emit({
+        type: "turn.completed",
+        eventId: EventId.make("folder-complete"),
+        provider: ProviderDriverKind.make("codex"),
+        createdAt: "2026-01-01T00:00:01.000Z",
+        threadId,
+        turnId,
+        payload: { state: "completed" },
+      });
+      expect(yield* harness.nextReceipt).toMatchObject({
+        type: "checkpoint.diff.finalized",
+        checkpointTurnCount: 1,
+      });
+      expect(yield* harness.nextReceipt).toMatchObject({
+        type: "turn.processing.quiesced",
+        checkpointTurnCount: 1,
+      });
+      yield* Effect.promise(harness.drain);
+      const model = yield* Effect.promise(harness.readModel);
+      expect(model.threads.find((thread) => thread.id === threadId)?.checkpoints).toMatchObject([
+        {
+          turnId,
+          status: "ready",
+          checkpointTurnCount: 1,
+          files: [
+            { path: "deps/library/README.md", additions: 1, deletions: 1 },
+            { path: "sdk/README.md", additions: 1, deletions: 1 },
+          ],
+        },
+      ]);
+      const addedRepo = NodePath.join(harness.cwd, "added-between-turns");
+      NodeFS.renameSync(createGitRepository(), addedRepo);
+      const nextTurnId = asTurnId("turn-folder-next");
+      harness.provider.emit({
+        type: "turn.started",
+        eventId: EventId.make("folder-next-start"),
+        provider: ProviderDriverKind.make("codex"),
+        createdAt: "2026-01-01T00:00:02.000Z",
+        threadId,
+        turnId: nextTurnId,
+      });
+      yield* Effect.promise(harness.drain);
+      NodeFS.writeFileSync(NodePath.join(addedRepo, "README.md"), "new repository change\n");
+      harness.provider.emit({
+        type: "turn.completed",
+        eventId: EventId.make("folder-next-complete"),
+        provider: ProviderDriverKind.make("codex"),
+        createdAt: "2026-01-01T00:00:03.000Z",
+        threadId,
+        turnId: nextTurnId,
+        payload: { state: "completed" },
+      });
+      expect(yield* harness.nextReceipt).toMatchObject({
+        type: "checkpoint.diff.finalized",
+        checkpointTurnCount: 2,
+      });
+      expect(yield* harness.nextReceipt).toMatchObject({
+        type: "turn.processing.quiesced",
+        checkpointTurnCount: 2,
+      });
+      yield* Effect.promise(harness.drain);
+      const nextModel = yield* Effect.promise(harness.readModel);
+      expect(
+        nextModel.threads.find((thread) => thread.id === threadId)?.checkpoints.at(-1),
+      ).toMatchObject({
+        turnId: nextTurnId,
+        files: [{ path: "added-between-turns/README.md", additions: 1, deletions: 1 }],
+      });
+    }),
+  );
 
   effectIt.effect.each([
     "active",

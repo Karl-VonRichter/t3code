@@ -245,11 +245,7 @@ export default function DiffPanel({
     selectedTurn &&
     (selectedTurn.checkpointTurnCount ?? inferredCheckpointTurnCountByTurnId[selectedTurn.turnId]);
   const latestTurn = orderedTurnDiffSummaries[0];
-  const turnReviewUnavailableReason = !isGitRepo
-    ? "Turn diffs for repository folders are not available yet."
-    : !latestTurn
-      ? "No completed turn checkpoints yet."
-      : null;
+  const turnReviewUnavailableReason = !latestTurn ? "No completed turn checkpoints yet." : null;
   const selectedScopeLabel =
     selectedTurnId === null
       ? selectedGitScope === "unstaged"
@@ -287,7 +283,7 @@ export default function DiffPanel({
       ignoreWhitespace: diffIgnoreWhitespace,
       cacheScope: selectedTurn ? `turn:${selectedTurn.turnId}` : null,
     },
-    { enabled: isGitRepo && selectedTurn !== undefined },
+    { enabled: selectedTurn !== undefined },
   );
   const primaryBranchDiffPreview = useEnvironmentQuery(
     selectedTurnId === null && activeThread && activeCwd

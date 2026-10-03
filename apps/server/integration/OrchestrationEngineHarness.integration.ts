@@ -25,6 +25,9 @@ import * as Stream from "effect/Stream";
 import * as Tracer from "effect/Tracer";
 
 import * as CheckpointStore from "../src/checkpointing/CheckpointStore.ts";
+import * as WorkspaceCheckpointStore from "../src/checkpointing/WorkspaceCheckpointStore.ts";
+import * as RepositoryDiscovery from "../src/workspace/RepositoryDiscovery.ts";
+import * as GitVcsDriver from "../src/vcs/GitVcsDriver.ts";
 import { TextGeneration } from "../src/textGeneration/TextGeneration.ts";
 import * as TerminalManager from "../src/terminal/Manager.ts";
 import { OrchestrationCommandReceiptRepositoryLive } from "../src/persistence/Layers/OrchestrationCommandReceipts.ts";
@@ -348,6 +351,12 @@ export const makeOrchestrationIntegrationHarness = (
       Layer.provideMerge(serverSettingsLayer),
     );
     const checkpointReactorLayer = CheckpointReactorLive.pipe(
+      Layer.provideMerge(
+        WorkspaceCheckpointStore.layer.pipe(
+          Layer.provide(RepositoryDiscovery.layer.pipe(Layer.provide(GitVcsDriver.layer))),
+          Layer.provide(checkpointStoreLayer),
+        ),
+      ),
       Layer.provideMerge(runtimeServicesLayer),
       Layer.provideMerge(
         Layer.mock(PullRequestService.PullRequestService)({

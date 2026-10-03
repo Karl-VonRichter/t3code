@@ -28,14 +28,14 @@ import {
   checkpointRefForThreadTurn,
   resolveThreadWorkspaceCwd,
 } from "../../checkpointing/Utils.ts";
-import * as CheckpointStore from "../../checkpointing/CheckpointStore.ts";
+import * as WorkspaceCheckpointStore from "../../checkpointing/WorkspaceCheckpointStore.ts";
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { CheckpointReactor, type CheckpointReactorShape } from "../Services/CheckpointReactor.ts";
 import { forkParked } from "../../serverActivation.ts";
 import { OrchestrationEngineService } from "../Services/OrchestrationEngine.ts";
 import { ProjectionSnapshotQuery } from "../Services/ProjectionSnapshotQuery.ts";
 import { RuntimeReceiptBus } from "../Services/RuntimeReceiptBus.ts";
-import type { CheckpointStoreError } from "../../checkpointing/Errors.ts";
+import type { CheckpointStoreError, WorkspaceCheckpointError } from "../../checkpointing/Errors.ts";
 import type { OrchestrationDispatchError } from "../Errors.ts";
 import { VcsStatusBroadcaster } from "../../vcs/VcsStatusBroadcaster.ts";
 import * as WorkspaceEntries from "../../workspace/WorkspaceEntries.ts";
@@ -86,7 +86,7 @@ const make = Effect.gen(function* () {
   const orchestrationEngine = yield* OrchestrationEngineService;
   const projectionSnapshotQuery = yield* ProjectionSnapshotQuery;
   const providerService = yield* ProviderService;
-  const checkpointStore = yield* CheckpointStore.CheckpointStore;
+  const checkpointStore = yield* WorkspaceCheckpointStore.WorkspaceCheckpointStore;
   const receiptBus = yield* RuntimeReceiptBus;
   const workspaceEntries = yield* WorkspaceEntries.WorkspaceEntries;
   const fileSystem = yield* FileSystem.FileSystem;
@@ -206,13 +206,13 @@ const make = Effect.gen(function* () {
   // Resolves the workspace CWD for checkpoint operations, preferring the
   // active provider session CWD and falling back to the thread/project config.
   // Returns undefined when no CWD can be determined or the workspace is not
-  // a git repository.
+  // a checkpoint workspace.
   const resolveCheckpointCwd = Effect.fn("resolveCheckpointCwd")(function* (input: {
     readonly threadId: ThreadId;
     readonly thread: { readonly projectId: ProjectId; readonly worktreePath: string | null };
     readonly projects: ReadonlyArray<{ readonly id: ProjectId; readonly workspaceRoot: string }>;
     readonly preferSessionRuntime: boolean;
-  }): Effect.fn.Return<string | undefined, CheckpointStoreError> {
+  }): Effect.fn.Return<string | undefined, CheckpointStoreError | WorkspaceCheckpointError> {
     const fromSession = yield* resolveSessionRuntimeForThread(input.threadId);
     const fromThread = resolveThreadWorkspaceCwd({
       thread: input.thread,
@@ -233,7 +233,7 @@ const make = Effect.gen(function* () {
     if (!cwd) {
       return undefined;
     }
-    if (!(yield* checkpointStore.isGitRepository(cwd))) {
+    if (!(yield* checkpointStore.isCheckpointWorkspace(cwd))) {
       return undefined;
     }
     return cwd;
@@ -285,6 +285,7 @@ const make = Effect.gen(function* () {
     yield* checkpointStore.captureCheckpoint({
       cwd: input.cwd,
       checkpointRef: targetCheckpointRef,
+      previousCheckpointRef: fromCheckpointRef,
     });
 
     // Refresh the workspace entry index so the @-mention file picker
@@ -490,14 +491,12 @@ const make = Effect.gen(function* () {
         cwd: checkpointCwd,
         checkpointRef: baselineCheckpointRef,
       });
-      if (baselineExists) {
-        return;
-      }
-
       yield* checkpointStore.captureCheckpoint({
         cwd: checkpointCwd,
         checkpointRef: baselineCheckpointRef,
+        preserveExisting: true,
       });
+      if (baselineExists) return;
       yield* receiptBus.publish({
         type: "checkpoint.baseline.captured",
         threadId: thread.id,
@@ -701,14 +700,12 @@ const make = Effect.gen(function* () {
       cwd: checkpointCwd,
       checkpointRef: baselineCheckpointRef,
     });
-    if (baselineExists) {
-      return;
-    }
-
     yield* checkpointStore.captureCheckpoint({
       cwd: checkpointCwd,
       checkpointRef: baselineCheckpointRef,
+      preserveExisting: true,
     });
+    if (baselineExists) return;
     yield* receiptBus.publish({
       type: "checkpoint.baseline.captured",
       threadId,
@@ -1002,7 +999,10 @@ const make = Effect.gen(function* () {
     input: ReactorInput,
   ): Effect.Effect<
     void,
-    CheckpointStoreError | OrchestrationDispatchError | PlatformError.PlatformError,
+    | CheckpointStoreError
+    | WorkspaceCheckpointError
+    | OrchestrationDispatchError
+    | PlatformError.PlatformError,
     never
   > =>
     input.source === "domain" ? processDomainEvent(input.event) : processRuntimeEvent(input.event);
