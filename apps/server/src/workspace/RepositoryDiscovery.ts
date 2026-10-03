@@ -29,6 +29,7 @@ export class RepositoryDiscovery extends Context.Service<
     readonly discover: (
       cwd: string,
       repositoryId?: string,
+      options?: { readonly fresh?: boolean },
     ) => Effect.Effect<RepositoryWorkspace | null, WorkspaceDiscoveryError>;
     readonly isContainer: (cwd: string) => Effect.Effect<boolean, WorkspaceDiscoveryError>;
   }
@@ -123,9 +124,11 @@ const make = Effect.gen(function* () {
   const discover = Effect.fn("RepositoryDiscovery.discover")(function* (
     cwd: string,
     repositoryId?: string,
+    options?: { readonly fresh?: boolean },
   ) {
     const root = yield* resolveRoot(cwd);
     if (root === null) return null;
+    if (options?.fresh) yield* Cache.invalidate(cache, root);
     const roots = yield* Cache.get(cache, root);
     // Preserve the existing single-repository review path.
     if (roots.length === 0 || (roots.length === 1 && roots[0] === root)) return null;

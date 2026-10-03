@@ -408,7 +408,7 @@ describe("proactive panels", () => {
       expect(
         resolveProactiveTurnDiffAction({
           checkpoint: changedCheckpoint,
-          isGitRepo: true,
+          canReviewWorkspace: true,
         }),
       ).toBe(action);
     },
@@ -427,19 +427,19 @@ describe("proactive panels", () => {
     expect(
       resolveProactiveTurnDiffAction({
         checkpoint: undefined,
-        isGitRepo: true,
+        canReviewWorkspace: true,
       }),
     ).toBe("defer");
     expect(
       resolveProactiveTurnDiffAction({
         checkpoint: missingCheckpoint,
-        isGitRepo: true,
+        canReviewWorkspace: true,
       }),
     ).toBe("defer");
     expect(
       resolveProactiveTurnDiffAction({
         checkpoint: changedCheckpoint,
-        isGitRepo: undefined,
+        canReviewWorkspace: undefined,
       }),
     ).toBe("defer");
   });

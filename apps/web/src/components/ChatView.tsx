@@ -4813,7 +4813,7 @@ export default function ChatView(props: ChatViewProps) {
     const diffAction = eligibleCompletion
       ? resolveProactiveTurnDiffAction({
           checkpoint: completedCheckpoint,
-          isGitRepo: gitStatusQuery.data?.isRepo,
+          canReviewWorkspace: gitStatusQuery.data ? canReviewWorkspace : undefined,
         })
       : "ignore";
     proactivePanelObservationRef.current = {
@@ -4836,7 +4836,8 @@ export default function ChatView(props: ChatViewProps) {
     activeThreadKey,
     activeThreadRef,
     clientSettingsHydrated,
-    gitStatusQuery.data?.isRepo,
+    gitStatusQuery.data,
+    canReviewWorkspace,
     isServerThread,
     latestTurnSettled,
     linkedThreadPullRequest,

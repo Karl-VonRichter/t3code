@@ -84,8 +84,23 @@ export class CheckpointRefUnavailableError extends Schema.TaggedError<Checkpoint
 
 export type CheckpointStoreError = VcsError;
 
+export class WorkspaceCheckpointError extends Schema.TaggedError<WorkspaceCheckpointError>()(
+  "WorkspaceCheckpointError",
+  {
+    operation: Schema.String,
+    cwd: Schema.String,
+    detail: Schema.optional(Schema.String),
+    cause: Schema.optional(Schema.Defect()),
+  },
+) {
+  override get message(): string {
+    return `Repository-folder checkpoint ${this.operation} failed: ${this.detail ?? "Could not read or write checkpoint metadata."}`;
+  }
+}
+
 export type CheckpointServiceError =
   | CheckpointStoreError
+  | WorkspaceCheckpointError
   | ProjectionRepositoryError
   | CheckpointDiffResultInvalidError
   | CheckpointThreadNotFoundError
