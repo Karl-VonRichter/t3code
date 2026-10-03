@@ -1732,7 +1732,7 @@ describe("proactive completed diff guard", () => {
       expect(
         resolveProactiveTurnDiffAction({
           checkpoint: changedCheckpoint,
-          isGitRepo: true,
+          canReviewWorkspace: true,
           activeSurfaceKind: null,
         }),
       ).toBe(action);
@@ -1752,21 +1752,21 @@ describe("proactive completed diff guard", () => {
     expect(
       resolveProactiveTurnDiffAction({
         checkpoint: undefined,
-        isGitRepo: true,
+        canReviewWorkspace: true,
         activeSurfaceKind: null,
       }),
     ).toBe("defer");
     expect(
       resolveProactiveTurnDiffAction({
         checkpoint: missingCheckpoint,
-        isGitRepo: true,
+        canReviewWorkspace: true,
         activeSurfaceKind: null,
       }),
     ).toBe("defer");
     expect(
       resolveProactiveTurnDiffAction({
         checkpoint: changedCheckpoint,
-        isGitRepo: undefined,
+        canReviewWorkspace: undefined,
         activeSurfaceKind: null,
       }),
     ).toBe("defer");
@@ -1781,7 +1781,7 @@ describe("proactive completed diff guard", () => {
     expect(
       resolveProactiveTurnDiffAction({
         checkpoint: changedCheckpoint,
-        isGitRepo: true,
+        canReviewWorkspace: true,
         activeSurfaceKind: "pull-request",
       }),
     ).toBe("ignore");

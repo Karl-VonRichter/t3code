@@ -182,14 +182,14 @@ export function shouldOpenProactiveTurnDiff(input: {
 
 export function resolveProactiveTurnDiffAction(input: {
   checkpoint: Pick<TurnDiffSummary, "status" | "files"> | undefined;
-  isGitRepo: boolean | undefined;
+  canReviewWorkspace: boolean | undefined;
   activeSurfaceKind: RightPanelSurface["kind"] | null;
 }): "defer" | "ignore" | "open" {
   if (input.activeSurfaceKind === "pull-request") return "ignore";
   if (input.checkpoint === undefined || input.checkpoint.status === "missing") return "defer";
-  if (input.isGitRepo === undefined) return "defer";
+  if (input.canReviewWorkspace === undefined) return "defer";
   if (
-    !input.isGitRepo ||
+    !input.canReviewWorkspace ||
     input.checkpoint.status !== "ready" ||
     input.checkpoint.files.length === 0
   ) {

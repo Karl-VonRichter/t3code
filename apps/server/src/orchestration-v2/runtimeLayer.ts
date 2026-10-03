@@ -13,6 +13,9 @@ import * as ProjectSetupScriptRunner from "../project/ProjectSetupScriptRunner.t
 import * as ManagedProjectFolders from "../project/ManagedProjectFolders.ts";
 import * as CheckpointCaptureService from "./CheckpointCaptureService.ts";
 import * as CheckpointService from "./CheckpointService.ts";
+import * as WorkspaceCheckpointStore from "../checkpointing/WorkspaceCheckpointStore.ts";
+import * as RepositoryDiscovery from "../workspace/RepositoryDiscovery.ts";
+import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as CheckpointRollbackService from "./CheckpointRollbackService.ts";
 import * as CommandPolicy from "./CommandPolicy.ts";
 import * as CommandReceiptStore from "./CommandReceiptStore.ts";
@@ -111,6 +114,11 @@ const layerProviderEventIngestorProvided = ProviderEventIngestor.layer.pipe(
 
 const layerCheckpointServiceProvided = CheckpointService.layer.pipe(
   Layer.provide(IdAllocator.layer),
+  Layer.provide(
+    WorkspaceCheckpointStore.layer.pipe(
+      Layer.provide(RepositoryDiscovery.layer.pipe(Layer.provide(GitVcsDriver.layer))),
+    ),
+  ),
 );
 const layerContextHandoffServiceProvided = ContextHandoffService.layer.pipe(
   Layer.provide(IdAllocator.layer),

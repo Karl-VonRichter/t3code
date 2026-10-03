@@ -14,6 +14,7 @@ import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 
 import * as CheckpointStore from "../checkpointing/CheckpointStore.ts";
+import * as WorkspaceCheckpointStore from "../checkpointing/WorkspaceCheckpointStore.ts";
 import * as CheckpointService from "./CheckpointService.ts";
 import * as IdAllocator from "./IdAllocator.ts";
 
@@ -51,8 +52,8 @@ it.effect.each([false, true, "interrupt"] as const)(
       Layer.provide(
         Layer.mergeAll(
           IdAllocator.layer,
-          Layer.mock(CheckpointStore.CheckpointStore)({
-            isGitRepository: () => Effect.succeed(true),
+          Layer.mock(WorkspaceCheckpointStore.WorkspaceCheckpointStore)({
+            isCheckpointWorkspace: () => Effect.succeed(true),
             hasCheckpointRef,
             captureCheckpoint: () => Effect.void,
           }),

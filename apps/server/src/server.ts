@@ -48,6 +48,7 @@ import * as OpenCodeServerLedger from "./provider/OpenCodeServerLedger.ts";
 import * as AcpRegistryCatalog from "./provider/Layers/AcpRegistryCatalog.ts";
 import * as CheckpointDiffQuery from "./checkpointing/CheckpointDiffQuery.ts";
 import * as CheckpointStore from "./checkpointing/CheckpointStore.ts";
+import * as WorkspaceCheckpointStore from "./checkpointing/WorkspaceCheckpointStore.ts";
 import * as AzureDevOpsCli from "./sourceControl/AzureDevOpsCli.ts";
 import * as BitbucketApi from "./sourceControl/BitbucketApi.ts";
 import * as GitHubCli from "./sourceControl/GitHubCli.ts";
@@ -336,9 +337,7 @@ const layerGit = Layer.empty.pipe(
   Layer.provideMerge(GitVcsDriver.layer),
 );
 
-const layerRepositoryDiscovery = RepositoryDiscovery.layer.pipe(
-  Layer.provide(GitVcsDriver.layer),
-);
+const layerRepositoryDiscovery = RepositoryDiscovery.layer.pipe(Layer.provide(GitVcsDriver.layer));
 
 const layerGitWorkflow = GitWorkflowService.layer.pipe(
   Layer.provide(layerRepositoryDiscovery),
@@ -389,6 +388,10 @@ const layerVcs = Layer.empty.pipe(
 );
 
 const layerCheckpointStore = CheckpointStore.layer.pipe(Layer.provide(layerVcsDriverRegistry));
+const layerWorkspaceCheckpointStore = WorkspaceCheckpointStore.layer.pipe(
+  Layer.provide(layerRepositoryDiscovery),
+  Layer.provideMerge(layerCheckpointStore),
+);
 
 const layerPortScanner = PortScanner.layer.pipe(Layer.provide(ProcessRunner.layer));
 
@@ -485,7 +488,7 @@ const layerOrchestrationV2Runtime = RuntimeLayer.layerProduction.pipe(
 );
 
 const layerOrchestrationApplication = CheckpointDiffQuery.layer.pipe(
-  Layer.provideMerge(layerCheckpointStore),
+  Layer.provideMerge(layerWorkspaceCheckpointStore),
   Layer.provideMerge(layerOrchestrationV2Runtime),
 );
 

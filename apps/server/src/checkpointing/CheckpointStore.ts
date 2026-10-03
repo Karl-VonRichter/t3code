@@ -40,6 +40,7 @@ export interface DiffCheckpointsInput {
   readonly fallbackFromToHead?: boolean;
   readonly ignoreWhitespace: boolean;
   readonly format?: "patch" | "numstat";
+  readonly pathPrefix?: string;
 }
 
 export interface DeleteCheckpointRefsInput {

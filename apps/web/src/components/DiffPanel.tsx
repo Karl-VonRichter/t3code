@@ -245,11 +245,7 @@ export default function DiffPanel({
     selectedTurn &&
     (selectedTurn.checkpointTurnCount ?? inferredCheckpointTurnCountByRunId[selectedTurn.runId]);
   const latestTurn = orderedTurnDiffSummaries[0];
-  const turnReviewUnavailableReason = !isGitRepo
-    ? "Turn diffs for repository folders are not available yet."
-    : !latestTurn
-      ? "No completed turn checkpoints yet."
-      : null;
+  const turnReviewUnavailableReason = !latestTurn ? "No completed turn checkpoints yet." : null;
   const selectedScopeLabel =
     selectedRunId === null
       ? selectedGitScope === "unstaged"
@@ -287,7 +283,7 @@ export default function DiffPanel({
       ignoreWhitespace: diffIgnoreWhitespace,
       cacheScope: selectedTurn ? `turn:${selectedTurn.runId}` : null,
     },
-    { enabled: isGitRepo && selectedTurn !== undefined },
+    { enabled: selectedTurn !== undefined },
   );
   const primaryBranchDiffPreview = useEnvironmentQuery(
     selectedRunId === null && activeThread && activeCwd
@@ -795,7 +791,7 @@ export default function DiffPanel({
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-        {showBranchRefSelector && selectedGitSource?.baseRef && (
+        {showBranchRefSelector && selectedGitSource && (workspace || selectedGitSource.baseRef) && (
           <div
             className="flex min-w-0 max-w-full items-center gap-2 overflow-hidden text-xs text-muted-foreground"
             aria-label={`Comparing ${selectedGitSource.headRef ?? "HEAD"} against ${selectedGitSource.baseRef}`}

@@ -19,7 +19,7 @@ import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
 import { parseTurnDiffFilesFromNumstat } from "../checkpointing/Diffs.ts";
-import * as CheckpointStore from "../checkpointing/CheckpointStore.ts";
+import * as WorkspaceCheckpointStore from "../checkpointing/WorkspaceCheckpointStore.ts";
 import * as IdAllocator from "./IdAllocator.ts";
 
 const CHECKPOINT_REFS_PREFIX = "refs/t3/orchestration-v2/checkpoints";
@@ -242,18 +242,18 @@ function makeCheckpoint(input: {
 export const layer: Layer.Layer<
   CheckpointServiceV2,
   never,
-  CheckpointStore.CheckpointStore | IdAllocator.IdAllocatorV2
+  WorkspaceCheckpointStore.WorkspaceCheckpointStore | IdAllocator.IdAllocatorV2
 > = Layer.effect(
   CheckpointServiceV2,
   Effect.gen(function* () {
-    const checkpointStore = yield* CheckpointStore.CheckpointStore;
+    const checkpointStore = yield* WorkspaceCheckpointStore.WorkspaceCheckpointStore;
     const idAllocator = yield* IdAllocator.IdAllocatorV2;
     const workspaceLocks = yield* KeyedLock.make<string>();
     const withWorkspaceLock = <A, E, R>(cwd: string, effect: Effect.Effect<A, E, R>) =>
       workspaceLocks.withLock(cwd, effect);
 
-    const isGitCheckpointable = (cwd: string) =>
-      checkpointStore.isGitRepository(cwd).pipe(Effect.orElseSucceed(() => false));
+    const isWorkspaceCheckpointable = (cwd: string) =>
+      checkpointStore.isCheckpointWorkspace(cwd).pipe(Effect.orElseSucceed(() => false));
 
     const ensureScope: CheckpointServiceV2Shape["ensureScope"] = (scope) => Effect.succeed(scope);
 
@@ -261,7 +261,7 @@ export const layer: Layer.Layer<
       withWorkspaceLock(
         input.scope.cwd,
         Effect.gen(function* () {
-          if (!(yield* isGitCheckpointable(input.scope.cwd))) {
+          if (!(yield* isWorkspaceCheckpointable(input.scope.cwd))) {
             return;
           }
 
@@ -269,17 +269,10 @@ export const layer: Layer.Layer<
             scopeId: input.scope.id,
             ordinalWithinScope: input.ordinalWithinScope,
           });
-          const exists = yield* checkpointStore.hasCheckpointRef({
-            cwd: input.scope.cwd,
-            checkpointRef,
-          });
-          if (exists) {
-            return;
-          }
-
           yield* checkpointStore.captureCheckpoint({
             cwd: input.scope.cwd,
             checkpointRef,
+            preserveExisting: true,
           });
         }),
       ).pipe(
@@ -306,7 +299,7 @@ export const layer: Layer.Layer<
               scopeId: input.scope.id,
               ordinalWithinScope: input.ordinalWithinScope,
             });
-            const checkpointable = yield* isGitCheckpointable(input.scope.cwd);
+            const checkpointable = yield* isWorkspaceCheckpointable(input.scope.cwd);
             const available = checkpointable
               ? yield* checkpointStore
                   .hasCheckpointRef({
@@ -371,7 +364,7 @@ export const layer: Layer.Layer<
             ordinalWithinScope: Math.max(0, input.ordinalWithinScope - 1),
           });
 
-          if (!(yield* isGitCheckpointable(input.scope.cwd))) {
+          if (!(yield* isWorkspaceCheckpointable(input.scope.cwd))) {
             return makeCheckpoint({
               id: checkpointId,
               scope: input.scope,
@@ -391,6 +384,7 @@ export const layer: Layer.Layer<
             .captureCheckpoint({
               cwd: input.scope.cwd,
               checkpointRef,
+              previousCheckpointRef,
             })
             .pipe(
               Effect.as(true),

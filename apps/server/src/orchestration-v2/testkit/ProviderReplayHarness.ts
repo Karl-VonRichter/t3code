@@ -12,6 +12,9 @@ import type { MigrationError } from "effect/sql/Migrator";
 import type { SqlError } from "effect/sql/SqlError";
 
 import * as CheckpointStore from "../../checkpointing/CheckpointStore.ts";
+import * as WorkspaceCheckpointStore from "../../checkpointing/WorkspaceCheckpointStore.ts";
+import * as RepositoryDiscovery from "../../workspace/RepositoryDiscovery.ts";
+import * as GitVcsDriver from "../../vcs/GitVcsDriver.ts";
 import * as ServerConfig from "../../config.ts";
 import * as SqlitePersistence from "../../persistence/Layers/Sqlite.ts";
 import * as ServerSettings from "../../serverSettings.ts";
@@ -320,7 +323,15 @@ export function layerWithRegistry<Error>(
     Layer.provide(NodeServices.layer),
   );
   const layerCheckpointServiceProvided = CheckpointService.layer.pipe(
-    Layer.provide(Layer.mergeAll(layerCheckpointStore, IdAllocator.layer)),
+    Layer.provide(
+      WorkspaceCheckpointStore.layer.pipe(
+        Layer.provide(RepositoryDiscovery.layer.pipe(Layer.provide(GitVcsDriver.layer))),
+        Layer.provide(layerCheckpointStore),
+        Layer.provide(layerServerConfig),
+        Layer.provide(NodeServices.layer),
+      ),
+    ),
+    Layer.provide(IdAllocator.layer),
   );
   const layerContextHandoffServiceProvided = ContextHandoffService.layer.pipe(
     Layer.provide(IdAllocator.layer),

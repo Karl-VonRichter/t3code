@@ -29,7 +29,7 @@ import {
   CheckpointWorkspacePathMissingError,
   type CheckpointServiceError,
 } from "./Errors.ts";
-import * as CheckpointStore from "./CheckpointStore.ts";
+import * as WorkspaceCheckpointStore from "./WorkspaceCheckpointStore.ts";
 
 /** Service tag for checkpoint diff queries. */
 export class CheckpointDiffQuery extends Context.Service<
@@ -76,7 +76,7 @@ function buildTurnDiffResult(
 /** @public Service construction is part of the canonical Effect module API. */
 export const make = Effect.gen(function* () {
   const threads = yield* ThreadManagement.ThreadManagementService;
-  const checkpointStore = yield* CheckpointStore.CheckpointStore;
+  const checkpointStore = yield* WorkspaceCheckpointStore.WorkspaceCheckpointStore;
 
   const getTurnDiff: CheckpointDiffQuery["Service"]["getTurnDiff"] = Effect.fn("getTurnDiff")(
     function* (input) {

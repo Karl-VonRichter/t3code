@@ -45,6 +45,50 @@ function makeRenderableFile(
 }
 
 describe("buildReviewSectionItems", () => {
+  it("renders a turn containing matching filenames in different repositories", () => {
+    const patch = ["sdk", "deps/library"]
+      .map((repository) =>
+        [
+          `diff --git a/${repository}/file.txt b/${repository}/file.txt`,
+          "index 0000000..1111111 100644",
+          `--- a/${repository}/file.txt`,
+          `+++ b/${repository}/file.txt`,
+          "@@ -1 +1 @@",
+          "-baseline",
+          `+${repository} change`,
+          "",
+        ].join("\n"),
+      )
+      .join("");
+    const checkpoint = makeCheckpoint({
+      runId: RunId.make("multi-repo-turn"),
+      checkpointTurnCount: 1,
+      completedAt: "2026-10-03T00:00:00.000Z",
+      files: ["sdk/file.txt", "deps/library/file.txt"].map((path) => ({
+        path,
+        kind: "modified",
+        additions: 1,
+        deletions: 1,
+      })),
+    });
+    const sections = buildReviewSectionItems({
+      checkpoints: [checkpoint],
+      gitSections: [],
+      turnDiffById: { "turn:1": patch },
+      loadingTurnIds: {},
+      loadingGitSections: false,
+    });
+    expect(sections[0]?.subtitle).toBe("2 files changed");
+    const parsed = buildReviewParsedDiff(sections[0]?.diff, "multi-repo-turn");
+    expect(parsed.kind).toBe("files");
+    if (parsed.kind !== "files") throw new Error("Expected repository-qualified turn files");
+    expect(parsed.files.map((file) => [file.path, file.additions, file.deletions])).toEqual([
+      ["sdk/file.txt", 1, 1],
+      ["deps/library/file.txt", 1, 1],
+    ]);
+    expect(new Set(parsed.files.map((file) => file.id)).size).toBe(2);
+  });
+
   it("keeps repository review selections separate even for identical Git scopes", () => {
     const gitSections: ReviewDiffPreviewSource[] = ["app", "platform"].map((id) => ({
       id: `${id}:working-tree`,

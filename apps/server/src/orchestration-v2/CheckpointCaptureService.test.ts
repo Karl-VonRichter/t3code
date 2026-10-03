@@ -22,7 +22,7 @@ import * as Ref from "effect/Ref";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import * as SqlitePersistence from "../persistence/Layers/Sqlite.ts";
-import * as CheckpointStore from "../checkpointing/CheckpointStore.ts";
+import * as WorkspaceCheckpointStore from "../checkpointing/WorkspaceCheckpointStore.ts";
 import { VcsProcessTimeoutError } from "@t3tools/contracts";
 import * as CheckpointService from "./CheckpointService.ts";
 import * as CheckpointCaptureService from "./CheckpointCaptureService.ts";
@@ -274,8 +274,8 @@ it.layer(layerProjectionStoreTest)("CheckpointCaptureServiceV2", (it) => {
                     Layer.provide(
                       Layer.mergeAll(
                         IdAllocator.layer,
-                        Layer.mock(CheckpointStore.CheckpointStore)({
-                          isGitRepository: () => Effect.succeed(true),
+                        Layer.mock(WorkspaceCheckpointStore.WorkspaceCheckpointStore)({
+                          isCheckpointWorkspace: () => Effect.succeed(true),
                           captureCheckpoint: () => Effect.void,
                           hasCheckpointRef: () =>
                             Effect.fail(

@@ -14,9 +14,14 @@ Each repository uses its own Git comparison base. You can select a different bra
 commit in review. Detached checkouts display their current commit. Git metadata, build
 output, installed dependencies, and directory symlinks are excluded from discovery.
 
-This supports review in the existing folder. Isolated tasks and turn checkpoints across
-repositories are not available yet. Commit, push, and pull request controls continue to
-operate on an individual Git repository.
+Select **Latest turn** or a previous turn to review changes across the folder's repositories.
+File paths include the repository's location in the project. Turn history starts with turns
+run after multi-repository checkpoints are available; older changes cannot be reconstructed.
+New repositories join turn comparisons after their first checkpoint has been captured.
+
+This supports review in the existing folder. Isolated tasks and file restore across
+repositories are not available yet. You can rewind the conversation without restoring files.
+Commit, push, and pull request controls continue to operate on an individual Git repository.
 
 ## Connect an account
 

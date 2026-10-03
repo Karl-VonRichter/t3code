@@ -9,6 +9,7 @@ import type { ProjectionCheckpointContext } from "../orchestration-v2/Projection
 import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.ts";
 import * as CheckpointDiffQuery from "./CheckpointDiffQuery.ts";
 import * as CheckpointStore from "./CheckpointStore.ts";
+import * as WorkspaceCheckpointStore from "./WorkspaceCheckpointStore.ts";
 import {
   CheckpointRefUnavailableError,
   CheckpointThreadNotFoundError,
@@ -54,7 +55,7 @@ function layerFor(input: {
         Layer.mock(ThreadManagement.ThreadManagementService)({
           getCheckpointContext: () => input.projection,
         }),
-        Layer.mock(CheckpointStore.CheckpointStore)({
+        Layer.mock(WorkspaceCheckpointStore.WorkspaceCheckpointStore)({
           diffCheckpoints: input.diffCheckpoints ?? (() => Effect.succeed("diff")),
         }),
       ),
