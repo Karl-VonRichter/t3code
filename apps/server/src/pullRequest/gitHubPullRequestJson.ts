@@ -384,6 +384,7 @@ const RawReviewSchema = Schema.Struct({
 const RawCommitSchema = Schema.Struct({
   oid: Schema.String,
   messageHeadline: Schema.optional(Schema.String),
+  messageBody: Schema.optional(Schema.String),
   committedDate: Schema.String,
   authors: Schema.optional(
     Schema.Array(
@@ -557,6 +558,7 @@ const RawReviewThreadsSchema = Schema.Struct({
                   commit: Schema.Struct({
                     oid: Schema.String,
                     messageHeadline: Schema.optional(Schema.NullOr(Schema.String)),
+                    message: Schema.optional(Schema.NullOr(Schema.String)),
                     committedDate: Schema.optional(Schema.NullOr(Schema.String)),
                     additions: Schema.optional(Schema.Int),
                     deletions: Schema.optional(Schema.Int),
@@ -921,6 +923,7 @@ export const REVIEW_THREADS_GRAPHQL_QUERY = `query($owner: String!, $name: Strin
           commit {
             oid
             messageHeadline
+            message
             committedDate
             additions
             deletions
@@ -1589,6 +1592,11 @@ function toCommits(
   return (commits ?? []).map((commit) => ({
     oid: commit.oid,
     messageHeadline: commit.messageHeadline ?? "",
+    ...(commit.messageBody === undefined
+      ? {}
+      : {
+          message: [commit.messageHeadline ?? "", commit.messageBody].filter(Boolean).join("\n\n"),
+        }),
     committedDate: commit.committedDate,
     authors: (commit.authors ?? []).flatMap((author) => {
       const actor = toCommitActor(author);
@@ -2477,6 +2485,7 @@ export function decodeReviewThreadsJson(
     commits.push({
       oid,
       messageHeadline: commit.messageHeadline ?? "",
+      ...(commit.message == null ? {} : { message: commit.message }),
       committedDate,
       authors: (commit.authors?.nodes ?? []).flatMap((author) => {
         const actor = toGraphqlCommitActor(author);

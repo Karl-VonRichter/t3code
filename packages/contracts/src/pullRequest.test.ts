@@ -4,6 +4,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   PullRequestActionInput,
   PullRequestCapabilities,
+  PullRequestCommit,
   PullRequestFilesViewedResult,
   PullRequestListInput,
   PullRequestListResult,
@@ -19,6 +20,25 @@ const decodeReviewerRequest = Schema.decodeUnknownSync(PullRequestReviewerReques
 const decodeAction = Schema.decodeUnknownSync(PullRequestActionInput);
 const decodeSetFilesViewed = Schema.decodeUnknownSync(PullRequestSetFilesViewedInput);
 const decodeFilesViewed = Schema.decodeUnknownSync(PullRequestFilesViewedResult);
+
+describe("commit messages", () => {
+  const decodeCommit = Schema.decodeUnknownSync(PullRequestCommit);
+  const commit = {
+    oid: "abc123",
+    messageHeadline: "Add history",
+    committedDate: "2026-07-01T00:00:00Z",
+  };
+
+  it("accepts a headline-only commit from an older server", () => {
+    expect(decodeCommit(commit)).toEqual(commit);
+  });
+
+  it("preserves the full message when crossing the wire", () => {
+    const message =
+      "Add history\n\n  Preserve <literal> text.\n\nSigned-off-by: Ada <ada@example.com>\n";
+    expect(decodeCommit({ ...commit, message }).message).toBe(message);
+  });
+});
 
 const LIST_RESULT: PullRequestListResult = {
   viewers: { "github.com": "bilal", "gitlab.com": "bilal.hassan" },
