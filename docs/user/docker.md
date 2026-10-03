@@ -49,8 +49,8 @@ minutes; generate a fresh link for each device.
 
 These links allow coding, terminals, and provider configuration. To administer
 client access in Connections settings, use the startup pairing link from the
-`t3` container logs instead. Replace its `http://0.0.0.0:3773` origin with the
-server's Tailscale HTTPS origin, keeping the path and token intact.
+`t3` container logs instead. Replace the HTTP origin printed in that link with
+the server's Tailscale HTTPS origin, keeping the path and token intact.
 
 ## Sign in and add projects
 
