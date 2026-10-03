@@ -35,6 +35,9 @@ line to add. Set `T3CODE_CHANNEL=nightly` to install the nightly train, or
 
 Run `t3 --help` for the full reference.
 
+To run your fork in Docker through Portainer, see
+[Portainer and Tailscale](./docker.md).
+
 To try T3 Code once without installing it, run `npx t3@latest` instead (needs
 Node.js for `npx`).
 

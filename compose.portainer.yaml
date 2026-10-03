@@ -1,0 +1,60 @@
+# Deploy from this fork using Portainer's Git repository stack source.
+services:
+  tailscale:
+    image: tailscale/tailscale:stable
+    hostname: ${TS_HOSTNAME:-t3code}
+    environment:
+      TS_HOSTNAME: ${TS_HOSTNAME:-t3code}
+      TS_AUTHKEY: ${TS_AUTHKEY:?Set a non-ephemeral Tailscale auth key in Portainer}
+      TS_AUTH_ONCE: "true"
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "true"
+      TS_SERVE_CONFIG: /config/serve.json
+      TS_ENABLE_HEALTH_CHECK: "true"
+      TS_LOCAL_ADDR_PORT: 127.0.0.1:9002
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+    configs:
+      - source: tailscale-serve
+        target: /config/serve.json
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:9002/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    restart: unless-stopped
+
+  t3:
+    image: t3code-fork:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    pull_policy: build
+    network_mode: service:tailscale
+    depends_on:
+      tailscale:
+        condition: service_started
+    volumes:
+      - agent-home:/home/node
+      - projects:/workspace
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+volumes:
+  tailscale-state:
+  agent-home:
+  projects:
+
+configs:
+  tailscale-serve:
+    content: |
+      {
+        "TCP": {"443": {"HTTPS": true}},
+        "Web": {
+          "$${TS_CERT_DOMAIN}:443": {
+            "Handlers": {"/": {"Proxy": "http://127.0.0.1:3773"}}
+          }
+        },
+        "AllowFunnel": {"$${TS_CERT_DOMAIN}:443": false}
+      }
