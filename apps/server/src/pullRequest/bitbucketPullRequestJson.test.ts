@@ -236,7 +236,7 @@ describe("decodeCommentsJson", () => {
 });
 
 describe("decodeCommitsJson", () => {
-  it("returns commits oldest first with only the subject line", () => {
+  it("returns commits oldest first and preserves the full message alongside the headline", () => {
     const decoded = expectSuccess(
       decodeCommitsJson(
         page([
@@ -259,6 +259,7 @@ describe("decodeCommitsJson", () => {
       { login: "ada", name: "Ada Lovelace", avatarUrl: null },
     ]);
     expect(decoded.items[1]?.messageHeadline).toBe("second");
+    expect(decoded.items[1]?.message).toBe("second\n\nbody text\n");
     expect(decoded.next).toBeNull();
   });
 

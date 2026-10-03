@@ -158,6 +158,7 @@ const RawDiffRefsSchema = Schema.Struct({
 const RawCommitSchema = Schema.Struct({
   id: TrimmedNonEmptyString,
   title: Schema.optional(Schema.NullOr(Schema.String)),
+  message: Schema.optional(Schema.NullOr(Schema.String)),
   committed_date: Schema.optional(Schema.NullOr(Schema.String)),
   created_at: Schema.optional(Schema.NullOr(Schema.String)),
   parent_ids: Schema.optional(Schema.Array(Schema.String)),
@@ -644,6 +645,7 @@ export function decodeCommitsJson(
     commits.push({
       oid: commit.value.id,
       messageHeadline: commit.value.title ?? "",
+      ...(commit.value.message == null ? {} : { message: commit.value.message }),
       committedDate,
       ...(commit.value.stats === null || commit.value.stats === undefined
         ? {}
