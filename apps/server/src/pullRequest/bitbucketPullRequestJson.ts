@@ -532,6 +532,7 @@ export function decodeCommitsJson(
     commits.push({
       oid: commit.hash,
       messageHeadline: (commit.message ?? "").split("\n")[0] ?? "",
+      ...(commit.message == null ? {} : { message: commit.message }),
       committedDate: toIsoUtc(committedDate),
       authors:
         linkedAuthor !== null

@@ -317,6 +317,18 @@ describe("decodeNotesJson", () => {
 });
 
 describe("decodeCommitsJson", () => {
+  it("preserves the full plain-text message alongside the title", () => {
+    const message =
+      "Add history\n\n  Keep indentation and <literal> text.\n\nSigned-off-by: Ada <ada@example.com>\n";
+    const commits = expectSuccess(
+      decodeCommitsJson(
+        JSON.stringify([
+          { id: "aaa", title: "Add history", message, committed_date: "2026-07-01T00:00:00Z" },
+        ]),
+      ),
+    );
+    expect(commits[0]).toMatchObject({ messageHeadline: "Add history", message });
+  });
   it("returns commits oldest first", () => {
     const commits = expectSuccess(
       decodeCommitsJson(

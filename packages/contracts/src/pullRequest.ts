@@ -312,6 +312,8 @@ export type PullRequestLabelCandidateList = typeof PullRequestLabelCandidateList
 export const PullRequestCommit = Schema.Struct({
   oid: TrimmedNonEmptyString,
   messageHeadline: Schema.String,
+  /** Full plain-text message, including the body. Older servers may only send the headline. */
+  message: Schema.optional(Schema.String),
   committedDate: IsoDateTime,
   /** Per-commit line counts where the host can return them without a request per commit. */
   additions: Schema.optional(NonNegativeInt),

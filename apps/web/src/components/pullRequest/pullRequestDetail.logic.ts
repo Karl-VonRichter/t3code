@@ -405,7 +405,7 @@ export interface PullRequestTimelineEvent {
   readonly kind: "opened" | "commit" | "comment" | "review" | "merged" | "closed";
   readonly title: string;
   readonly body: string | null;
-  /** Whether `body` is markdown. A commit headline is plain text and must not be parsed as one. */
+  /** Whether `body` is markdown. A commit message is plain text and must not be parsed as one. */
   readonly markdown: boolean;
   /** Where the entry can be read on the host. Null for events the host gives no page of its own. */
   readonly url: string | null;
@@ -502,7 +502,7 @@ export function buildPullRequestTimeline(
       at: commit.committedDate,
       kind: "commit" as const,
       title: `Commit ${commit.oid.slice(0, 7)}`,
-      body: commit.messageHeadline || null,
+      body: commit.message || commit.messageHeadline || null,
       markdown: false,
       url: null,
       actor: commit.authors?.[0] ?? null,

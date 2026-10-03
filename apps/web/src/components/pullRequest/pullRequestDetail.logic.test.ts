@@ -516,6 +516,23 @@ describe("review verdicts", () => {
 });
 
 describe("pull request timeline", () => {
+  it("keeps the full commit message as plain text and falls back for older servers", () => {
+    const commit = TIMELINE_SOURCE.commits[0]!;
+    const message =
+      "add the page\n\n  Preserve <literal> text.\n\nSigned-off-by: Ada <ada@example.com>\n";
+    const events = buildPullRequestTimeline({
+      ...TIMELINE_SOURCE,
+      commits: [
+        { ...commit, message },
+        { ...commit, oid: "old-server" },
+      ],
+    });
+    expect(events.find((event) => event.id === commit.oid)).toMatchObject({
+      body: message,
+      markdown: false,
+    });
+    expect(events.find((event) => event.id === "old-server")?.body).toBe(commit.messageHeadline);
+  });
   it("orders creation, commits and comments newest first", () => {
     // What happened last is what the reader opening the tab is asking about.
     expect(buildPullRequestTimeline(TIMELINE_SOURCE).map((event) => event.id)).toEqual([

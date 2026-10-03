@@ -22,6 +22,7 @@ import { useAtomCommand } from "~/state/use-atom-command";
 import { formatRelativeTimeLabel } from "~/timestampFormat";
 
 import { Button } from "../ui/button";
+import { CommitMessage } from "../CommitMessage";
 import { PullRequestEditButton } from "./PullRequestEditButton";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "../ui/collapsible";
 import { toastManager } from "../ui/toast";
@@ -374,20 +375,21 @@ function CommitEvent({
   onOpen: (oid: string) => void;
 }) {
   return (
-    <button
-      type="button"
-      className="group relative mb-5 block w-full cursor-pointer rounded-sm pl-12 text-left outline-none [contain-intrinsic-block-size:48px] [content-visibility:auto] focus-visible:ring-2 focus-visible:ring-ring"
-      aria-label={`View commit ${event.id}`}
-      onClick={() => onOpen(event.id)}
-    >
+    <div className="relative mb-5 pl-12 [contain-intrinsic-block-size:48px] [content-visibility:auto]">
       <ActorTimelineMarker
         actors={event.commitAuthors}
         fallback={<GitCommitHorizontalIcon className="size-3.5" />}
+        className="top-6"
       />
-      <div className="flex min-w-0 items-center gap-2.5 py-1.5">
+      <button
+        type="button"
+        className="group flex w-full min-w-0 cursor-pointer items-center gap-2.5 rounded-sm py-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        aria-label={`View commit ${event.id}`}
+        onClick={() => onOpen(event.id)}
+      >
         <div className="min-w-0 flex-1">
           <div className="truncate text-xs font-semibold text-foreground transition-colors group-hover:text-primary">
-            {event.body ?? "Untitled commit"}
+            {event.body?.split("\n")[0] || "Untitled commit"}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-3xs text-muted-foreground">
             <code className="font-mono">{event.id.slice(0, 7)}</code>
@@ -401,8 +403,9 @@ function CommitEvent({
             className="ml-auto shrink-0 font-mono text-3xs"
           />
         ) : null}
-      </div>
-    </button>
+      </button>
+      {event.body ? <CommitMessage message={event.body} /> : null}
+    </div>
   );
 }
 

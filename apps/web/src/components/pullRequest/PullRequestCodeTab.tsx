@@ -58,6 +58,7 @@ import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
 
 import { DiffPanelLoadingState } from "../DiffPanelShell";
+import { CommitMessage } from "../CommitMessage";
 import { DiffCommentAnnotation } from "../diffs/DiffCommentAnnotation";
 import { DiffFileTree } from "../diffs/DiffFileTree";
 import { useCodeViewFileReveal } from "../diffs/useCodeViewFileReveal";
@@ -1324,9 +1325,18 @@ function PullRequestCodeTab({
   );
   // The toolbar rides above every branch below, not just the one with a patch in it: a commit
   // whose diff is empty or unreadable still needs the scope dropdown that got the reader there.
+  const commitMessage = selectedCommit ? (
+    <div className="shrink-0 border-b border-border/60 px-4 py-2">
+      <CommitMessage
+        key={selectedCommit.oid}
+        message={selectedCommit.message || selectedCommit.messageHeadline}
+      />
+    </div>
+  ) : null;
   const withToolbar = (body: ReactNode) => (
     <div className="flex h-full min-h-0 flex-col">
       {toolbar}
+      {commitMessage}
       <div className="min-h-0 flex-1 overflow-auto">{body}</div>
     </div>
   );
@@ -1404,6 +1414,7 @@ function PullRequestCodeTab({
   return (
     <div className="flex h-full min-h-0 flex-col">
       {toolbar}
+      {commitMessage}
       {/* Above the code, closed, and counted: these belong to the change rather than to any
             line of it, and in the stream they read as cards dropped into the patch. */}
       {orphanFiles.size > 0 ? (

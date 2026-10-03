@@ -200,6 +200,7 @@ export function forgejoCommit(commit: typeof ForgejoCommit.Type): PullRequestCom
   return {
     oid: commit.sha,
     messageHeadline: commit.commit.message.split("\n")[0] ?? "",
+    message: commit.commit.message,
     committedDate: toIsoUtc(commit.commit.committer.date),
     authors: author ? [author] : [],
     ...(commit.stats

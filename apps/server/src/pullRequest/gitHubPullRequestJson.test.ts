@@ -267,6 +267,7 @@ describe("pull request detail decoding", () => {
       {
         oid: "abc1234",
         messageHeadline: "Ship the timeline",
+        messageBody: "Explain the change.\n\nSigned-off-by: Ada <ada@example.com>",
         committedDate: "2026-07-05T00:00:00Z",
         authors: [
           { login: "octocat", name: "Octo Cat", email: "octo@example.com" },
@@ -388,6 +389,13 @@ describe("pull request detail decoding", () => {
       { login: "octocat", name: "Octo Cat", avatarUrl: null },
       { login: "Pair Author", name: "Pair Author", avatarUrl: null },
     ]);
+  });
+
+  it("preserves the commit body from the CLI activity response", () => {
+    const detail = expectSuccess(decodePullRequestActivityJson(detailJson));
+    expect(detail.commits[0]?.message).toBe(
+      "Ship the timeline\n\nExplain the change.\n\nSigned-off-by: Ada <ada@example.com>",
+    );
   });
 
   it("drops the bodyless review GitHub opens to hold line comments", () => {
@@ -575,6 +583,8 @@ describe("review thread decoding", () => {
                       commit: {
                         oid: "abc123",
                         messageHeadline: "Ship the timeline",
+                        message:
+                          "Ship the timeline\n\nExplain the change.\n\nSigned-off-by: Ada <ada@example.com>\n",
                         committedDate: "2026-07-05T00:00:00Z",
                         additions: 18,
                         deletions: 7,
@@ -601,6 +611,8 @@ describe("review thread decoding", () => {
       {
         oid: "abc123",
         messageHeadline: "Ship the timeline",
+        message:
+          "Ship the timeline\n\nExplain the change.\n\nSigned-off-by: Ada <ada@example.com>\n",
         committedDate: "2026-07-05T00:00:00Z",
         authors: [{ login: "julius", name: "Julius", avatarUrl: null }],
       },
