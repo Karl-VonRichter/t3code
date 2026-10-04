@@ -6,9 +6,13 @@ Install `vp` using the [root README](../../README.md#install-vp). The checkout r
 Bun is optional. From the repository root:
 
 ```sh
+sh ./setup.sh
 vp i
 vp run dev
 ```
+
+`setup.sh` creates the local Claude skill-directory symlink. Git ignores the
+generated link so Portainer can clone the repository.
 
 Open the pairing URL printed by the dev runner. The bare origin does not authenticate
 a new browser.
