@@ -7,8 +7,9 @@ HTTPS address. It uses Docker Standalone, not Swarm, and requires Docker Compose
 
 ## Deploy
 
-Push `Dockerfile`, `.dockerignore`, and `compose.portainer.yaml` to the branch of
-your fork you want to run.
+Use the `feat/portainer-tailscale` branch of your fork. Portainer rejects Git
+repositories containing symbolic links, so keep this deployment branch free of
+tracked symlinks.
 
 In the Tailscale admin console, enable MagicDNS and HTTPS certificates, then
 create a non-ephemeral auth key for the new server. If your tailnet requires
@@ -18,7 +19,7 @@ allow your phone and computers to reach the new device on TCP port 443.
 In Portainer, choose **Stacks → Add stack → Git repository**:
 
 - Repository: `https://github.com/Karl-VonRichter/t3code`
-- Reference: the branch containing the container files
+- Reference: `refs/heads/feat/portainer-tailscale`
 - Compose path: `compose.portainer.yaml`
 - Environment variable `TS_AUTHKEY`: your new Tailscale auth key
 - Optional `TS_HOSTNAME`: defaults to `t3code`
