@@ -11,9 +11,9 @@ RUN npm install --global pnpm@11.10.0
 WORKDIR /src
 COPY . .
 ENV CI=true ELECTRON_SKIP_BINARY_DOWNLOAD=1
+RUN pnpm install --frozen-lockfile --filter=t3... --filter=@t3tools/web... --filter=@t3tools/scripts...
 ARG BUILD_VERSION
 RUN if [ -n "$BUILD_VERSION" ]; then node scripts/update-release-package-versions.ts "$BUILD_VERSION"; fi
-RUN pnpm install --frozen-lockfile --filter=t3... --filter=@t3tools/web... --filter=@t3tools/scripts...
 RUN pnpm exec vp run --filter=t3 build
 # Generate a portable runtime with the versions from the workspace lockfile.
 RUN pnpm --filter=t3 deploy --prod --config.inject-workspace-packages=true /opt/t3
