@@ -52,6 +52,35 @@ This document covers the unified release workflow for stable and nightly desktop
   - nightly releases are aliased to the `nightly` hosted app channel
 - Signing is optional and auto-detected per platform from secrets.
 
+## Fork builds on GitHub-hosted runners
+
+Forks use [Build fork](../../.github/workflows/fork-build.yml) for Docker and desktop
+builds. Push to `main` to build both, or run the workflow manually and select
+Docker, desktop, or both. Mobile builds are separate and are not included.
+
+Docker builds run natively on x64 and ARM64 Linux runners, smoke-test the server
+and bundled providers, and publish one multi-platform image to
+`ghcr.io/<owner>/<repository>`. The default branch gets `latest`; every build gets
+a branch tag and `sha-<full-commit-sha>`. Publishing uses the workflow's
+`GITHUB_TOKEN`, so no registry secret is required. New GHCR packages are private
+by default: make the package public for anonymous pulls, or configure registry
+credentials in Portainer. See [Docker deployment](../user/docker.md).
+
+Desktop installers and self-contained CLI archives appear in the run's
+**Artifacts**. Linux and Windows build x64 and ARM64; macOS builds Apple Silicon
+and Intel installers, with a CLI archive only on Apple Silicon because Node SEA
+does not support Intel macOS. Windows embeds the corresponding Linux CLI archive
+for its WSL backend. Builds use fork prerelease versions and do not publish an
+updater feed, npm packages, or GitHub Releases. Desktop signing is optional and
+uses the Apple/Azure settings documented below.
+
+Direct Tailscale pairing needs no cloud configuration. To enable a relay in
+desktop builds, set repository variables `CLERK_PUBLISHABLE_KEY`,
+`CLERK_JWT_TEMPLATE`, `CLERK_CLI_OAUTH_CLIENT_ID`, and `T3CODE_RELAY_URL` together.
+The Docker image defaults to direct pairing. The upstream release train is
+restricted to `pingdotgg/t3code` because it depends on upstream deployment and
+publication credentials.
+
 ## Pull request macOS previews
 
 Labeling a PR `preview:mac` publishes a signed, notarized Apple Silicon DMG with T3 Connect enabled

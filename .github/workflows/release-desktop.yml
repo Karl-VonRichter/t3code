@@ -42,6 +42,11 @@ on:
       runner:
         required: true
         type: string
+      build_timeout_minutes:
+        description: Override the full job budget, including the Windows wait for the Linux CLI archive.
+        required: false
+        default: 0
+        type: number
       platform:
         required: true
         type: string
@@ -103,7 +108,7 @@ jobs:
     runs-on: ${{ inputs.runner }}
     # Windows waits for the Linux CLI archive inside its own budget (see
     # "Wait for Linux CLI archive"), so it gets that wait on top of the usual 30.
-    timeout-minutes: ${{ inputs.platform == 'win' && 70 || 30 }}
+    timeout-minutes: ${{ inputs.build_timeout_minutes || (inputs.platform == 'win' && 70 || 30) }}
     env:
       T3CODE_CLERK_PUBLISHABLE_KEY: ${{ inputs.clerk_publishable_key }}
       T3CODE_CLERK_JWT_TEMPLATE: ${{ inputs.clerk_jwt_template }}

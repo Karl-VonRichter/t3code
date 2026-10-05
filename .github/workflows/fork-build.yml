@@ -1,0 +1,306 @@
+name: Build fork
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      desktop:
+        description: Build desktop installers and CLI archives
+        type: boolean
+        default: true
+      docker:
+        description: Build and publish the server image to GHCR
+        type: boolean
+        default: true
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: fork-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: github.repository != 'pingdotgg/t3code'
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.config.outputs.version }}
+      image: ${{ steps.config.outputs.image }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          sparse-checkout: apps/server/package.json
+          sparse-checkout-cone-mode: false
+      - name: Resolve fork version and image name
+        id: config
+        shell: bash
+        run: |
+          base_version=$(node -p "require('./apps/server/package.json').version.split('-')[0]")
+          echo "version=${base_version}-fork.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+  bundle:
+    name: Build web, server, and Electron bundles
+    needs: prepare
+    if: github.event_name == 'push' || inputs.desktop
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      T3CODE_CLERK_PUBLISHABLE_KEY: ${{ vars.CLERK_PUBLISHABLE_KEY }}
+      T3CODE_CLERK_JWT_TEMPLATE: ${{ vars.CLERK_JWT_TEMPLATE }}
+      T3CODE_CLERK_CLI_OAUTH_CLIENT_ID: ${{ vars.CLERK_CLI_OAUTH_CLIENT_ID }}
+      T3CODE_RELAY_URL: ${{ vars.T3CODE_RELAY_URL }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            /*
+            !/.repos/
+          sparse-checkout-cone-mode: false
+      - uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb # v1
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: false
+      - name: Install build dependencies
+        run: vp install --filter=t3... --filter=@t3tools/web... --filter=@t3tools/desktop... --filter=@t3tools/scripts...
+      - name: Set fork version
+        env:
+          BUILD_VERSION: ${{ needs.prepare.outputs.version }}
+        run: node scripts/update-release-package-versions.ts "$BUILD_VERSION"
+      - uses: ./.github/actions/setup-apt-mirrors
+      - name: Install browser secret helper build libraries
+        run: sudo apt-get update && sudo apt-get install -y libsecret-1-dev pkg-config
+      - name: Build shared bundles
+        run: vp run build:desktop
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: js-bundle
+          path: |
+            apps/server/dist
+            apps/desktop/dist-electron
+          if-no-files-found: error
+          retention-days: 7
+
+  desktop:
+    name: Desktop ${{ matrix.label }}
+    needs: [prepare, bundle]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Linux x64
+            runner: ubuntu-24.04
+            platform: linux
+            target: AppImage
+            arch: x64
+            rust_target: x86_64-unknown-linux-gnu
+            resource_key: linux-x64
+            cli_archive: true
+          - label: Linux arm64
+            runner: ubuntu-24.04-arm
+            platform: linux
+            target: AppImage
+            arch: arm64
+            rust_target: aarch64-unknown-linux-gnu
+            resource_key: linux-arm64
+            cli_archive: true
+          - label: Windows x64
+            runner: windows-2025
+            platform: win
+            target: nsis
+            arch: x64
+            rust_target: x86_64-pc-windows-msvc
+            resource_key: win32-x64
+            cli_archive: true
+          - label: Windows arm64
+            runner: windows-11-arm
+            platform: win
+            target: nsis
+            arch: arm64
+            rust_target: aarch64-pc-windows-msvc
+            resource_key: win32-arm64
+            cli_archive: true
+          - label: macOS arm64
+            runner: macos-26
+            platform: mac
+            target: dmg
+            arch: arm64
+            rust_target: aarch64-apple-darwin
+            resource_key: darwin-arm64
+            cli_archive: true
+          - label: macOS x64
+            runner: macos-26-intel
+            platform: mac
+            target: dmg
+            arch: x64
+            rust_target: x86_64-apple-darwin
+            resource_key: darwin-x64
+            # Node SEA does not support macOS x64; the desktop app does.
+            cli_archive: false
+    uses: ./.github/workflows/release-desktop.yml
+    secrets: inherit
+    with:
+      label: ${{ matrix.label }}
+      runner: ${{ matrix.runner }}
+      platform: ${{ matrix.platform }}
+      target: ${{ matrix.target }}
+      arch: ${{ matrix.arch }}
+      rust_target: ${{ matrix.rust_target }}
+      resource_key: ${{ matrix.resource_key }}
+      cli_archive: ${{ matrix.cli_archive }}
+      build_timeout_minutes: 90
+      version: ${{ needs.prepare.outputs.version }}
+      ref: ${{ github.sha }}
+      release_channel: preview
+      relay_client_tracing: false
+      clerk_publishable_key: ${{ vars.CLERK_PUBLISHABLE_KEY }}
+      clerk_jwt_template: ${{ vars.CLERK_JWT_TEMPLATE }}
+      clerk_cli_oauth_client_id: ${{ vars.CLERK_CLI_OAUTH_CLIENT_ID }}
+      relay_url: ${{ vars.T3CODE_RELAY_URL }}
+
+  docker:
+    name: Server image ${{ matrix.arch }}
+    needs: prepare
+    if: github.event_name == 'push' || inputs.docker
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            /*
+            !/.repos/
+          sparse-checkout-cone-mode: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      - name: Build image for smoke test
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: .
+          platforms: linux/${{ matrix.arch }}
+          load: true
+          tags: t3code:smoke
+          build-args: BUILD_VERSION=${{ needs.prepare.outputs.version }}
+          cache-from: type=gha,scope=t3code-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=t3code-${{ matrix.arch }}
+      - name: Smoke-test T3 and provider executables
+        run: |
+          docker run --rm --entrypoint /bin/sh t3code:smoke -ec 't3 --version; codex --version; claude --version'
+      - name: Smoke-test server startup
+        shell: bash
+        run: |
+          start=$(date +%s)
+          container_id=$(docker run --detach --health-interval 2s --health-start-period 0s --health-retries 30 t3code:smoke)
+          trap 'docker logs "$container_id"; docker rm --force "$container_id"' EXIT
+          timeout 90 python3 - "$container_id" "$start" <<'PY'
+          import subprocess, sys
+          events = subprocess.Popen([
+              "docker", "events", "--since", sys.argv[2],
+              "--filter", f"container={sys.argv[1]}", "--filter", "event=health_status",
+              "--format", "{{.Status}}",
+          ], stdout=subprocess.PIPE, text=True)
+          try:
+              for status in events.stdout:
+                  if status.strip() == "health_status: healthy":
+                      break
+                  if status.strip() == "health_status: unhealthy":
+                      sys.exit("Server failed its health check")
+              else:
+                  sys.exit("Docker health event stream ended unexpectedly")
+          finally:
+              events.terminate()
+              events.wait()
+          PY
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish tested image by digest
+        id: push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: .
+          platforms: linux/${{ matrix.arch }}
+          build-args: BUILD_VERSION=${{ needs.prepare.outputs.version }}
+          outputs: type=image,name=${{ needs.prepare.outputs.image }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=t3code-${{ matrix.arch }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+      - name: Export digest
+        env:
+          IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          touch "$RUNNER_TEMP/digests/${IMAGE_DIGEST#sha256:}"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: image-digest-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish_image:
+    name: Publish multi-platform image
+    needs: [prepare, docker]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: image-digest-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/digests
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Choose image tags
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
+        with:
+          images: ${{ needs.prepare.outputs.image }}
+          tags: |
+            type=sha,format=long
+            type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Combine architectures and publish tags
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          IMAGE: ${{ needs.prepare.outputs.image }}
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+        shell: bash
+        run: |
+          tags=()
+          while IFS= read -r tag; do
+            tags+=(--tag "$tag")
+          done <<< "$IMAGE_TAGS"
+          digests=()
+          for digest in *; do
+            digests+=("${IMAGE}@sha256:${digest}")
+          done
+          docker buildx imagetools create "${tags[@]}" "${digests[@]}"
+          docker buildx imagetools inspect "${IMAGE}:sha-${GITHUB_SHA}"
+          printf 'Published `%s:sha-%s` for linux/amd64 and linux/arm64.\n' "$IMAGE" "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
