@@ -529,6 +529,56 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
 
       assert.isNull(preview.publish);
       assert.isNull(previewChannel.publish);
+      const forkNightly = yield* createBuildConfig(
+        "win",
+        "nsis",
+        "0.0.42-nightly.20261102.1",
+        false,
+        false,
+        undefined,
+        undefined,
+      ).pipe(
+        Effect.provide(
+          ConfigProvider.layer(
+            ConfigProvider.fromEnv({
+              env: {
+                GITHUB_REPOSITORY: "pingdotgg/t3code",
+                T3CODE_DESKTOP_UPDATE_REPOSITORY: "Karl-VonRichter/t3code",
+              },
+            }),
+          ),
+        ),
+      );
+      assert.deepStrictEqual(forkNightly.publish, [
+        {
+          provider: "github",
+          owner: "Karl-VonRichter",
+          repo: "t3code",
+          releaseType: "prerelease",
+          channel: "nightly",
+        },
+      ]);
+      const manualMac = yield* createBuildConfig(
+        "mac",
+        "dmg",
+        "0.0.42-nightly.20261102.1",
+        false,
+        false,
+        undefined,
+        undefined,
+      ).pipe(
+        Effect.provide(
+          ConfigProvider.layer(
+            ConfigProvider.fromEnv({
+              env: {
+                GITHUB_REPOSITORY: "",
+                T3CODE_DESKTOP_UPDATE_REPOSITORY: "",
+              },
+            }),
+          ),
+        ),
+      );
+      assert.isNull(manualMac.publish);
       assert.deepStrictEqual(release.publish, [
         {
           provider: "github",

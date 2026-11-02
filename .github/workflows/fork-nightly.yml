@@ -1,0 +1,301 @@
+name: Fork nightly
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *"
+
+concurrency:
+  group: fork-nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  prepare:
+    if: github.repository == 'Karl-VonRichter/t3code'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      build: ${{ steps.source.outputs.build }}
+      ref: ${{ steps.source.outputs.ref }}
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      mac_signed: ${{ steps.config.outputs.mac_signed }}
+      clerk_publishable_key: ${{ steps.config.outputs.clerk_publishable_key }}
+      clerk_jwt_template: ${{ steps.config.outputs.clerk_jwt_template }}
+      clerk_cli_oauth_client_id: ${{ steps.config.outputs.clerk_cli_oauth_client_id }}
+      relay_url: ${{ steps.config.outputs.relay_url }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            /*
+            !/.repos/
+          sparse-checkout-cone-mode: false
+      - id: source
+        uses: actions/github-script@v8
+        with:
+          script: |
+            if (context.ref !== 'refs/heads/main') throw new Error('Fork nightlies must build main.');
+            const { data: releases } = await github.rest.repos.listReleases({...context.repo, per_page: 100});
+            const latest = releases.find(r => !r.draft && /^v\d+\.\d+\.\d+-nightly\./.test(r.tag_name));
+            core.setOutput('build', latest?.target_commitish !== context.sha);
+            core.setOutput('ref', context.sha);
+      - uses: ./.github/actions/setup-ci-deps
+        if: steps.source.outputs.build == 'true'
+        with:
+          install-args: --filter=@t3tools/scripts...
+      - id: version
+        if: steps.source.outputs.build == 'true'
+        shell: bash
+        run: |
+          node scripts/resolve-nightly-release.ts \
+            --date "$(date -u +%Y%m%d)" --run-number "$GITHUB_RUN_NUMBER" \
+            --sha "$GITHUB_SHA" --github-output
+      - id: config
+        if: steps.source.outputs.build == 'true'
+        shell: bash
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          MACOS_PROVISIONING_PROFILE: ${{ secrets.MACOS_PROVISIONING_PROFILE }}
+        run: |
+          set -euo pipefail
+          signed=true
+          for key in CSC_LINK CSC_KEY_PASSWORD APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER APPLE_TEAM_ID MACOS_PROVISIONING_PROFILE; do
+            [[ -n "${!key}" ]] || signed=false
+          done
+          echo "mac_signed=$signed" >> "$GITHUB_OUTPUT"
+          for pair in clerk_publishable_key:T3CODE_CLERK_PUBLISHABLE_KEY clerk_jwt_template:T3CODE_CLERK_JWT_TEMPLATE clerk_cli_oauth_client_id:T3CODE_CLERK_CLI_OAUTH_CLIENT_ID relay_url:T3CODE_RELAY_URL; do
+            name="${pair##*:}"
+            value="$(sed -n "s/^${name}=//p" .env.example | head -n 1)"
+            [[ "$value" =~ ^[A-Za-z0-9._:/-]+$ ]] || exit 1
+            echo "${pair%%:*}=$value" >> "$GITHUB_OUTPUT"
+          done
+
+  bundle:
+    name: Validate and build JS bundle
+    needs: prepare
+    if: needs.prepare.outputs.build == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --max-old-space-size=12288
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+          persist-credentials: false
+          sparse-checkout: |
+            /*
+            !/.repos/
+          sparse-checkout-cone-mode: false
+      - uses: ./.github/actions/setup-ci-deps
+      - uses: ./.github/actions/setup-apt-mirrors
+      - name: Install native build libraries
+        run: sudo apt-get update && sudo apt-get install -y libsecret-1-dev pkg-config
+      - name: Check provider maintenance and release configuration
+        run: >-
+          vp test run
+          packages/provider-core/src/server/maintenanceResolver.test.ts
+          apps/server/src/provider/providerMaintenanceRunner.test.ts
+          apps/server/src/provider/Drivers/CodexDriver.test.ts
+          packages/contracts/src/settings.test.ts
+          scripts/build-desktop-artifact.test.ts
+          scripts/merge-update-manifests.test.ts
+      - name: Check fork release stamping
+        run: node --test .github/scripts/configure-fork-release.test.cjs
+      - name: Align release versions and public configuration
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          node .github/scripts/configure-fork-release.cjs "$GITHUB_REPOSITORY"
+          node scripts/update-release-package-versions.ts "$VERSION"
+          cp .env.example .env
+      - name: Build JS bundle
+        env:
+          T3CODE_TELEMETRY_CHANNEL: dev
+        run: vp run build:desktop
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: js-bundle
+          path: |
+            apps/server/dist
+            apps/desktop/dist-electron
+          if-no-files-found: error
+          retention-days: 3
+
+  desktop_linux_x64:
+    name: Desktop Linux x64
+    needs: [prepare, bundle]
+    uses: ./.github/workflows/release-desktop.yml
+    secrets: inherit
+    with:
+      label: Linux x64
+      runner: ubuntu-24.04
+      platform: linux
+      target: AppImage
+      arch: x64
+      rust_target: x86_64-unknown-linux-gnu
+      resource_key: linux-x64
+      cli_archive: true
+      launch_check: true
+      version: ${{ needs.prepare.outputs.version }}
+      ref: ${{ needs.prepare.outputs.ref }}
+      release_channel: nightly
+      update_repository: Karl-VonRichter/t3code
+      relay_client_tracing: false
+      clerk_publishable_key: ${{ needs.prepare.outputs.clerk_publishable_key }}
+      clerk_jwt_template: ${{ needs.prepare.outputs.clerk_jwt_template }}
+      clerk_cli_oauth_client_id: ${{ needs.prepare.outputs.clerk_cli_oauth_client_id }}
+      relay_url: ${{ needs.prepare.outputs.relay_url }}
+
+  desktop_mac_arm64:
+    name: Desktop macOS arm64
+    needs: [prepare, bundle]
+    uses: ./.github/workflows/release-desktop.yml
+    secrets: inherit
+    with:
+      label: macOS arm64
+      runner: macos-15
+      platform: mac
+      target: dmg
+      arch: arm64
+      rust_target: aarch64-apple-darwin
+      resource_key: darwin-arm64
+      cli_archive: true
+      launch_check: true
+      version: ${{ needs.prepare.outputs.version }}
+      ref: ${{ needs.prepare.outputs.ref }}
+      release_channel: nightly
+      update_repository: Karl-VonRichter/t3code
+      relay_client_tracing: false
+      clerk_publishable_key: ${{ needs.prepare.outputs.clerk_publishable_key }}
+      clerk_jwt_template: ${{ needs.prepare.outputs.clerk_jwt_template }}
+      clerk_cli_oauth_client_id: ${{ needs.prepare.outputs.clerk_cli_oauth_client_id }}
+      relay_url: ${{ needs.prepare.outputs.relay_url }}
+
+  desktop_win_x64:
+    name: Desktop Windows x64
+    needs: [prepare, bundle]
+    uses: ./.github/workflows/release-desktop.yml
+    secrets: inherit
+    with:
+      label: Windows x64
+      runner: ubuntu-24.04
+      verify_runner: windows-2025
+      platform: win
+      target: nsis
+      arch: x64
+      rust_target: x86_64-pc-windows-msvc
+      resource_key: win32-x64
+      cli_archive: true
+      version: ${{ needs.prepare.outputs.version }}
+      ref: ${{ needs.prepare.outputs.ref }}
+      release_channel: nightly
+      update_repository: Karl-VonRichter/t3code
+      relay_client_tracing: false
+      clerk_publishable_key: ${{ needs.prepare.outputs.clerk_publishable_key }}
+      clerk_jwt_template: ${{ needs.prepare.outputs.clerk_jwt_template }}
+      clerk_cli_oauth_client_id: ${{ needs.prepare.outputs.clerk_cli_oauth_client_id }}
+      relay_url: ${{ needs.prepare.outputs.relay_url }}
+
+  publish:
+    name: Publish verified fork nightly
+    needs: [prepare, desktop_linux_x64, desktop_mac_arm64, desktop_win_x64]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+          persist-credentials: false
+          sparse-checkout: |
+            .github/scripts/configure-fork-release.cjs
+            packages/shared/src/cliRelease.ts
+            scripts/install.sh
+            scripts/install.ps1
+          sparse-checkout-cone-mode: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: desktop-*
+          merge-multiple: true
+          path: release-assets
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: cli-*
+          merge-multiple: true
+          path: release-assets
+      - name: Validate update feed and prepare release
+        shell: bash
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          SOURCE_SHA: ${{ needs.prepare.outputs.ref }}
+          MAC_SIGNED: ${{ needs.prepare.outputs.mac_signed }}
+        run: |
+          set -euo pipefail
+          node .github/scripts/configure-fork-release.cjs "$GITHUB_REPOSITORY"
+          cp scripts/install.sh scripts/install.ps1 release-assets/
+          cd release-assets
+          test -s nightly-win-x64.yml
+          mv nightly-win-x64.yml nightly.yml
+          test -s nightly-linux.yml
+          if [[ "$MAC_SIGNED" == true ]]; then
+            test -s nightly-mac.yml
+          else
+            test ! -e nightly-mac.yml
+          fi
+          test -n "$(find . -maxdepth 1 -name '*arm64.dmg' -print -quit)"
+          test -n "$(find . -maxdepth 1 -name '*.exe' -print -quit)"
+          test -n "$(find . -maxdepth 1 -name '*.AppImage' -print -quit)"
+          test -n "$(find . -maxdepth 1 -name 't3-*-linux-x64.tar.gz' -print -quit)"
+          test -n "$(find . -maxdepth 1 -name 't3-*-darwin-arm64.tar.gz' -print -quit)"
+          test -n "$(find . -maxdepth 1 -name 't3-*-win32-x64.zip' -print -quit)"
+          rm -f builder-debug.yml builder-debug-win-x64.yml
+          sha256sum * > ../SHA256SUMS
+          mv ../SHA256SUMS .
+          {
+            echo "Fork nightly built from $SOURCE_SHA. Includes the separate Codex/Claude maintenance executable fix (upstream PR #23890)."
+            echo
+            echo "Windows x64 and Linux x64 use Karl-VonRichter/t3code's nightly update feed after a one-time fork installation."
+            if [[ "$MAC_SIGNED" == true ]]; then
+              echo "Mac arm64 is signed and configured for this fork's nightly feed."
+            else
+              echo "Mac arm64 is unsigned and manual-install only: Apple Developer ID signing is not configured. Its in-app update feed is disabled. macOS passkeys are unavailable in unsigned builds."
+            fi
+            echo
+            echo "CLI archives are included for remote T3 servers; Codex and Claude CLI installations remain separately maintained by AgentFleet."
+            echo "This fork does not automatically merge upstream commits. Nightlies build changes committed to fork main."
+          } > ../release-notes.md
+      - name: Publish complete release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          SOURCE_SHA: ${{ needs.prepare.outputs.ref }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/$GH_REPO/releases/tags/$TAG" > "$RUNNER_TEMP/existing-release.json" 2>/dev/null; then
+            node -e 'const r=require(process.argv[1]); if (!r.draft || r.target_commitish !== process.env.SOURCE_SHA) process.exit(1)' "$RUNNER_TEMP/existing-release.json"
+            gh release upload "$TAG" release-assets/* --clobber
+            gh release edit "$TAG" --title "T3 Code Fork Nightly $VERSION" --notes-file release-notes.md
+          else
+            gh release create "$TAG" release-assets/* --draft --prerelease --latest=false \
+              --target "$SOURCE_SHA" --title "T3 Code Fork Nightly $VERSION" --notes-file release-notes.md
+          fi
+          gh release edit "$TAG" --draft=false --prerelease --latest=false
