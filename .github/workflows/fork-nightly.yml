@@ -68,11 +68,10 @@ jobs:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
-          MACOS_PROVISIONING_PROFILE: ${{ secrets.MACOS_PROVISIONING_PROFILE }}
         run: |
           set -euo pipefail
           signed=true
-          for key in CSC_LINK CSC_KEY_PASSWORD APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER APPLE_TEAM_ID MACOS_PROVISIONING_PROFILE; do
+          for key in CSC_LINK CSC_KEY_PASSWORD APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER APPLE_TEAM_ID; do
             [[ -n "${!key}" ]] || signed=false
           done
           echo "mac_signed=$signed" >> "$GITHUB_OUTPUT"
@@ -167,6 +166,7 @@ jobs:
     secrets: inherit
     with:
       label: macOS arm64
+      mac_passkeys: false
       runner: macos-15
       platform: mac
       target: dmg
@@ -272,7 +272,7 @@ jobs:
             echo
             echo "Windows x64 and Linux x64 use Karl-VonRichter/t3code's nightly update feed after a one-time fork installation."
             if [[ "$MAC_SIGNED" == true ]]; then
-              echo "Mac arm64 is signed and configured for this fork's nightly feed."
+              echo "Mac arm64 is signed, notarized and configured for this fork's nightly feed. Passkeys are disabled because this fork has no passkey provisioning profile."
             else
               echo "Mac arm64 is unsigned and manual-install only: Apple Developer ID signing is not configured. Its in-app update feed is disabled. macOS passkeys are unavailable in unsigned builds."
             fi

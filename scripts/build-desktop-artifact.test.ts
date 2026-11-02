@@ -1462,7 +1462,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       browserPasskeys: false,
     });
 
-    assert.deepStrictEqual(configuration.rpDomains, [
+    assert.deepStrictEqual(configuration?.rpDomains, [
       "clerk.example.com",
       "example.clerk.accounts.dev",
     ]);
@@ -1541,6 +1541,35 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       entitlements,
       /<key>com\.apple\.developer\.web-browser\.public-key-credential<\/key>\s*<true\/>/u,
     );
+  });
+
+  it("keeps hardened runtime permissions without claiming passkeys when disabled", () => {
+    const configuration = resolveMacPasskeySigningConfiguration({
+      T3CODE_DESKTOP_MAC_PASSKEYS: "false",
+    });
+    assert.isUndefined(configuration);
+    const entitlements = renderMacPasskeyEntitlements(configuration, {
+      touchIdKeychainAccessGroup: undefined,
+      browserPasskeys: false,
+    });
+    for (const entitlement of [
+      "com.apple.security.cs.allow-jit",
+      "com.apple.security.cs.allow-unsigned-executable-memory",
+      "com.apple.security.cs.disable-library-validation",
+      "com.apple.security.device.camera",
+      "com.apple.security.device.audio-input",
+    ]) {
+      assert.include(entitlements, `<key>${entitlement}</key>`);
+    }
+    for (const entitlement of [
+      "com.apple.application-identifier",
+      "com.apple.developer.team-identifier",
+      "com.apple.developer.associated-domains",
+      "keychain-access-groups",
+      "com.apple.developer.web-browser.public-key-credential",
+    ]) {
+      assert.notInclude(entitlements, `<key>${entitlement}</key>`);
+    }
   });
 
   it("rejects incomplete macOS passkey signing configuration", () => {

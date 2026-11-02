@@ -33,11 +33,18 @@ install with no in-app update feed. macOS passkeys require a signed, provisioned
 app. The workflow does not disable signature verification to enable updates.
 
 To enable signed Mac nightlies, configure the fork's `CSC_LINK`,
-`CSC_KEY_PASSWORD`, `APPLE_API_KEY`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER` and
-`MACOS_PROVISIONING_PROFILE` secrets, plus its `APPLE_TEAM_ID` variable, using
+`CSC_KEY_PASSWORD`, `APPLE_API_KEY`, `APPLE_API_KEY_ID` and `APPLE_API_ISSUER`
+secrets, plus its `APPLE_TEAM_ID` variable, using
 the existing [release signing procedure](release.md). Configure secrets through
 GitHub's private settings, never in source or chat. Publish a new nightly and
 install that signed app once before following subsequent signed updates.
+
+The fork sets `mac_passkeys: false` in the reusable desktop workflow. That sets
+`T3CODE_DESKTOP_MAC_PASSKEYS=false` in the packager: signing and notarization
+remain enabled, and restricted passkey entitlements are omitted. Passkeys need a
+matching `MACOS_PROVISIONING_PROFILE` and the Clerk/AASA registration described
+in the release procedure. The reusable workflow keeps passkeys enabled by
+default and still requires that profile for other callers.
 
 Upstream-only **CI** and **Release** workflows are disabled on this fork;
 **Fork nightly** supplies its own hosted-runner checks and publishing path.
